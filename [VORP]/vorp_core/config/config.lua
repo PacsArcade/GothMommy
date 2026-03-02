@@ -52,7 +52,7 @@ Config = {
 
     PVP                   = true,         -- Enables player vs player combat.
 
-    PVPToggle             = false,        -- Allows players to toggle their PVP status.
+    PVPToggle             = true,        -- Allows players to toggle their PVP status.
 
     CommandOnOffPVP       = 'pvp',        -- Command to toggle PVP status, requires PVPToggle to be true.
 
@@ -245,7 +245,7 @@ Config = {
         {
             text = 'Join Discord!',                        -- Text displayed on the first button.
             -- URL the first button directs to. Replace with your Discord invite link.
-            url = 'https://discord.gg/vorpcore'
+            url = 'https://discord.gg/HtYxK8GAdQ'
 
         },
         {

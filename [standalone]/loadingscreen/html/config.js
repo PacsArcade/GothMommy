@@ -6,13 +6,13 @@
 var staff_team = [
 
 	{
-		"name": "Owner name",
-		"image": "https://forum.cfx.re/user_avatar/forum.cfx.re/neveradevelopment/144/4447132_2.png",
+		"name": "Pac's Arcade",
+		"image": "https://forum.cfx.re/user_avatar/forum.cfx.re/adminpacman/144/4447132_2.png",
 		"rank": "Owner"
 	},
 	{
-		"name": "Admin name",
-		"image": "https://forum.cfx.re/user_avatar/forum.cfx.re/neveradevelopment/144/4447132_2.png",
+		"name": "AdminPacman",
+		"image": "https://forum.cfx.re/user_avatar/forum.cfx.re/adminpacman/144/4447132_2.png",
 		"rank": "Admin"
 	}
 
@@ -30,7 +30,7 @@ const showPlayersList = true
 // green
 // pink
 // purple
-const theme = "orange"
+const theme = "pink"
 
 // ==== WINTER UPDATE !! ==== \\
 const enableWinterUpdate = false
@@ -40,24 +40,24 @@ const enableWinterUpdate = false
 // Text settings
 const name = "<strong>VORP</strong>CORE"
 const underName = "ROLE<b>PLAY</b>"
-const desc = "RedM Roleplay server featuring an extensive collection of custom scripts, maps, vehicles, unique weapons, and much more."
+const desc = "Goth Mommy RedM Roleplay server. Enjoy the fun 🖤 "
 
 
 // Social media
-const discord = "https://discord.gg/"  // If = "" then icon will not show up on screen
+const discord = "https://discord.gg/HtYxK8GAdQ"  // If = "" then icon will not show up on screen
 const instagram = ""	// https://example.com
 const youtube = "" 		// https://example.com
 const twitter = "" 		// https://example.com
 const tiktok = ""  		// https://example.com
 const facebook = ""		// https://example.com
 const twitch = "" 		// https://example.com
-const github = "" 		// https://example.com
+const github = "https://github.com/PacsArcade/" 		// https://example.com
 
 
 
 // Player List
 const serverCode = "******" //Your server CODE from fivem. (cfx.re/join/abcdef) this ABCDEF is your code, paste it in serverCode. 
-const playerProfileImage = "https://forum.cfx.re/user_avatar/forum.cfx.re/neveradevelopment/144/4447132_2.png"
+const playerProfileImage = "https://forum.cfx.re/user_avatar/forum.cfx.re/adminpacman/144/4447132_2.png"
 
 
 // Video Settings
