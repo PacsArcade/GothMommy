@@ -862,6 +862,7 @@ end)
 -- apply whistle data on character selected
 RegisterNetEvent("vorp:SelectedCharacter", function(charid)
 	CHARID = charid
+	TriggerEvent("ricx_vampire:reset_ped")
 	-- if it exists set is current values that were saved when player first made a character
 	local whistleData <const> = GetResourceKvpString(("vorp_character_whistle_%s"):format(charid))
 	if whistleData then
