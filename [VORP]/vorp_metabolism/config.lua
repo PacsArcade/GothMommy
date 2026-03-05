@@ -2,7 +2,7 @@ Config = {
   DevMode = false,
   Langs = "en",                        -- Set the language for your script (you can change this if you support multiple languages).
 
-  UseMetabolism = true,                -- Enable/disable metabolism system. If true, metabolism effects like stamina and hunger will affect players.
+  UseMetabolism = false,                -- Enable/disable metabolism system. If true, metabolism effects like stamina and hunger will affect players.
 
   EveryTimeStatusDown = 3600,          -- Time interval (in milliseconds) for status drop (3.6 seconds).
   HowAmountThirstWhileRunning = 3,     -- How much thirst decreases while running (value decreases every 3.6 seconds).
@@ -790,6 +790,22 @@ Config = {
       Hunger = 400,
       Metabolism = 250,
       Stamina = 200,
+      InnerCoreHealth = 25,
+      OuterCoreHealth = 15,
+      PropName = "p_pie01x",
+      Animation = "eat",
+      Effect = "",
+      EffectDuration = "",
+      GiveBackItemLabel = "",
+      GiveBackItem = "",
+      GiveBackItemAmount = 1
+    },
+        {
+      Name = "bread",
+      Thirst = 0,
+      Hunger = 100,
+      Metabolism = 50,
+      Stamina = 50,
       InnerCoreHealth = 25,
       OuterCoreHealth = 15,
       PropName = "p_pie01x",

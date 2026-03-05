@@ -38,9 +38,9 @@ const enableWinterUpdate = false
 
 
 // Text settings
-const name = "<strong>Goth Mommy 🖤</strong>CORE"
-const underName = "ROLE<b>PLAY</b>"
-const desc = "Goth Mommy RedM RP Server ...stay tuned."
+const name = "<strong>Goth Mommy</strong>CORE"
+const underName = "🖤 ROLE<b>PLAY 🖤</b>"
+const desc = "Oiled up and ready to go!"
 
 
 // Social media
