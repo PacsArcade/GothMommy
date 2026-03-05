@@ -38,7 +38,7 @@ const enableWinterUpdate = false
 
 
 // Text settings
-const name = "<strong>Goth Mommy</strong>CORE"
+const name = "<strong>Goth Mommy</strong>"
 const underName = "🖤 ROLE<b>PLAY 🖤</b>"
 const desc = "Oiled up and ready to go!"
 
