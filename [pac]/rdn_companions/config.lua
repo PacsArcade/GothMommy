@@ -7,7 +7,7 @@ Config.Locale = "en"
 
 Config.Framework = "vorp" -- IMPORTANT: Put either "redem" or "vorp" depending on your framework. VORP users need to also change the Convar in .fxmanifest !!
 
-Config.CallPetKey = false --Set to true to use the CallPet hotkey below
+Config.CallPetKey = true --Set to true to use the CallPet hotkey below
 
 Config.TriggerKeys = {
     OpenShop = 'E',
@@ -48,7 +48,7 @@ Config.AnimalTrackingJobs = {
 Config.SearchRadius = 50.0 -- How far the pet will search for a hunted animal. Always a float value i.e 50.0
 Config.FeedInterval = 1200 -- How often in seconds the pet will want to be fed
 
-Config.RaiseAnimal = true -- If this is enabled, you will have to feed your animal for it to gain XP and grow. Only full grown pets can use commands (halfway you get the Stay command)
+Config.RaiseAnimal = false -- If this is enabled, you will have to feed your animal for it to gain XP and grow. Only full grown pets can use commands (halfway you get the Stay command)
 
 Config.FullGrownXp = 200 -- The amount of XP that it is fully grown. At the halfway point the pet will grow to 50% of max size.
 Config.XpPerFeed = 20 -- The amount of XP every feed gives
