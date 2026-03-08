@@ -73,6 +73,10 @@ RegisterNetEvent('fx-idcard:client:setData',function(data)
     idcardData = data
 end)
 
+RegisterNetEvent('fx-idcard:client:clearData', function()
+    idcardData = false
+end)
+
 RegisterNUICallback('createIdCard',function(data)
    TriggerServerEvent('fx-idcard:server:buyIdCard',data)
 end)

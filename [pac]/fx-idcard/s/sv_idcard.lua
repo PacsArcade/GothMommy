@@ -44,6 +44,8 @@ RegisterNetEvent('fx-idcard:server:GetData', function()
                 end
                 TriggerClientEvent('fx-idcard:client:setData', src, cardData)
             end)
+        else
+            TriggerClientEvent('fx-idcard:client:clearData', src)
         end
     end)
 end)
