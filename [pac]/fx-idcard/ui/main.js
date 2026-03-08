@@ -13,7 +13,7 @@ $(document).ready(function () {
     
         var sex = array.sex === "Female" ? "F" : "M";
         $(".charid").html(array.charid || "N/A");
-        $(".license").html(`FIXITFY-${array.charid || "N/A"}`);
+        $(".license").html(array.prev_license || `GMRP-${array.charid || "N/A"}`);
         $(".sex").html(sex);
         $(".hair").html(array.hair || "N/A");
         $(".eyes").html(array.eye || "N/A");
