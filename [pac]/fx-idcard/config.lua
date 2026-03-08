@@ -3,35 +3,37 @@ Config.Language = "en"
 Config.ShowIdcardCommand = "idcard" -- If this command works if TakeCardType is selected as “sql”
 Config.TakeCardType = "sql" ---- or "sql" (If you select item, it will give you a special ID card with metada and you can have more than one ID card. If you select sql, it will be saved in everyone's data and you will be able to create id card only 1 time.)
 Config.Keybinds = {
-    ["takephoto"] = 0x760A9C6F,
-    ["exit"] = 0x156F7119,
+    ["takephoto"] = 0xC7B5340A,  -- ENTER
+    ["exit"]      = 0x156F7119,  -- BACKSPACE
 
-    ["camUp"] = 0x62800C92,
-    ["camDown"] = 0x8BDE7443,
+    ["camUp"]      = 0x8FD015D8, -- W
+    ["camDown"]    = 0xD27782E3, -- S
+    ["camLeft"]    = 0x7065027D, -- A
+    ["camRight"]   = 0xB4E465B4, -- D
 
-    ["camLeft"] = 0x07CE1E61,
-    ["camRight"] = 0xF84FA74F,
+    ["camForward"] = 0x446258B6, -- PAGE UP   (zoom in)
+    ["camBack"]    = 0x3C3DD371, -- PAGE DOWN (zoom out)
 
-    ["camForward"] = 0xCBD5B26E,
-    ["camBack"] = 0x110AD1D2,
+    ["filterNext"] = 0x8BDE7443, -- DOWN ARROW (cycle filter forward)
+    ["filterPrev"] = 0x62800C92, -- UP ARROW   (cycle filter back)
 
-    ["printphoto"] = 0xC7B5340A,
-    ["takeidcard"] = 0x2CD5343E,--
+    ["printphoto"] = 0xCBD5B26E, -- placeholder, not used in camera mode
+    ["takeidcard"] = 0x2CD5343E, -- unchanged
 }
 Config.Locale = {
     ["en"] = {
         --- PROMPTS ---
         ["promptitle"] = "Photographer",
         ["promptitle2"] = "Id Card System",
-        ["takephoto"] = "Take Photo",
+        ["takephoto"] = "Take Photo [Enter]",
         ["printphoto"] = "Print Photo",
         ["exit"] = "Exit",
         ["camUp"] = "Up",
         ["camDown"] = "Down",
         ["camLeft"] = "Left",
         ["camRight"] = "Right",
-        ["camForward"] = "Forward",
-        ["camBack"] = "Back",
+        ["camForward"] = "Zoom In",
+        ["camBack"] = "Zoom Out",
         ["promptitle2"] = "Identity Card System",
         ["promptitle3"] = "Illegal Identity Card",
         ["takeidcard"] = "Take Id Card",
@@ -145,11 +147,22 @@ Config.Photographers = {
         pedCoords = vector4(-815.55, -1374.78, 44.28, -91.68),
         camCoords = vector4(-814.40, -1374.85, 44.90, 86.48),
         camFov = 60.0,
+        npc = {
+            model = "mp_npcambig_m_photogr",
+            coords = vector4(-811.50, -1372.80, 44.07, 285.0),
+            anim = "WORLD_HUMAN_SMOKE_NERVOUS_STRESSED",
+        },
+        blip = {
+            name = "ID Photo",
+            sprite = -1656531561,
+            scale = 0.6,
+            modifier = "BLIP_MODIFIER_MP_COLOR_32",
+        },
     },
 }
 
 Config.PedSpawnDistance = 30
-Config.Religious = {"Christian"} -- {"Christian","Muslim","Jewish"} 
+Config.Religious = {"Christian", "Buddhist", "Wiccan", "Pagan", "Coven", "Vampire Cult", "Spiritualist", "Atheist", "Jewish", "Muslim"}
 Config.IDCardNPC = {
     ["Blackwater"] = {
         coords = vector4(-798.8420, -1194.6926, 44.0010, 161.6237),

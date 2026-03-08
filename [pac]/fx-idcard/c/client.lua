@@ -37,6 +37,8 @@ local keysTable = {
     {Locale("camRight"), Config.Keybinds["camRight"]},
     {Locale("camForward"), Config.Keybinds["camForward"]},
     {Locale("camBack"), Config.Keybinds["camBack"]},
+    {"Filter Next", Config.Keybinds["filterNext"]},  -- added for cam filters
+    {"Filter Prev", Config.Keybinds["filterPrev"]},  -- added for cam filters
 }
 
 local keysTable2 = {
@@ -189,6 +191,8 @@ local function setActivePrompts(Type)
         Citizen.InvokeNative(0x71215ACCFDE075EE, movements[7], false)
         Citizen.InvokeNative(0x71215ACCFDE075EE, movements[8], false)
         Citizen.InvokeNative(0x71215ACCFDE075EE, movements[9], false)
+        Citizen.InvokeNative(0x71215ACCFDE075EE, movements[10], false)
+        Citizen.InvokeNative(0x71215ACCFDE075EE, movements[11], false)
     elseif Type == "camera" then
         Citizen.InvokeNative(0x71215ACCFDE075EE, movements[1], false)
         Citizen.InvokeNative(0x71215ACCFDE075EE, movements[2], false)
@@ -199,6 +203,8 @@ local function setActivePrompts(Type)
         Citizen.InvokeNative(0x71215ACCFDE075EE, movements[7], true)
         Citizen.InvokeNative(0x71215ACCFDE075EE, movements[8], true)
         Citizen.InvokeNative(0x71215ACCFDE075EE, movements[9], true)
+        Citizen.InvokeNative(0x71215ACCFDE075EE, movements[10], true)
+        Citizen.InvokeNative(0x71215ACCFDE075EE, movements[11], true)
     -- elseif Type == "idcard" then
     --     Citizen.InvokeNative(0x71215ACCFDE075EE, movements[1], false)
     --     Citizen.InvokeNative(0x71215ACCFDE075EE, movements[2], false)
@@ -242,30 +248,65 @@ local function takePhoto(v)
     DoScreenFadeIn(1000)
 
     Citizen.CreateThread(function()
-        while cam do
-            local title = CreateVarString(10, 'LITERAL_STRING',"Photographer")
+local filters = {
+    false,                  -- no filter (default)
+    "OJDominoBlur",
+    "SwitchHUDIn",
+    "Prologue_heroin_fx",
+    "DeathFailMPDark",
+    "SwitchHUDMid",
+}
+local currentFilter = 1
+
+Citizen.CreateThread(function()
+    while cam do
+        local title = CreateVarString(10, 'LITERAL_STRING', "Photographer")
             PromptSetActiveGroupThisFrame(prompts, title)
             setActivePrompts("camera")
-            if IsDisabledControlPressed(0,Config.Keybinds["exit"]) then
+
+            if IsDisabledControlPressed(0, Config.Keybinds["exit"]) then
+                -- stop any active filter
+                for _, fx in ipairs(filters) do
+                    if fx then AnimpostfxStop(fx) end
+                end
+                currentFilter = 1
                 RenderScriptCams(false, false, 0, true, true)
                 DestroyCam(cam, true)
-                cam = nil            
+                cam = nil
                 SetPlayerControl(PlayerId(), true)
                 FreezeEntityPosition(PlayerPedId(), false)
-                TriggerServerEvent('fx-idcard:server:setBucket',0)
+                TriggerServerEvent('fx-idcard:server:setBucket', 0)
                 Config.ShowHud()
-            elseif IsDisabledControlPressed(0,Config.Keybinds["camUp"]) then
-                changeCamPosition(0,0,0.01)
-            elseif IsDisabledControlPressed(0,Config.Keybinds["camDown"]) then
-                changeCamPosition(0,0,-0.01)
-            elseif IsDisabledControlPressed(0,Config.Keybinds["camLeft"]) then
-                changeCamPosition(0,-0.01,0)
-            elseif IsDisabledControlPressed(0,Config.Keybinds["camRight"]) then
-                changeCamPosition(0,0.01,0)
-            elseif IsDisabledControlPressed(0,Config.Keybinds["camForward"]) then
-                changeCamPosition(-0.01,0,0)
-            elseif IsDisabledControlPressed(0,Config.Keybinds["camBack"]) then
-                changeCamPosition(0.01,0,0)
+
+            elseif IsDisabledControlJustPressed(0, Config.Keybinds["filterNext"]) then
+                if filters[currentFilter] then AnimpostfxStop(filters[currentFilter]) end
+                currentFilter = (currentFilter % #filters) + 1
+                if filters[currentFilter] then
+                    AnimpostfxPlay(filters[currentFilter])
+                    AnimpostfxSetStrength(filters[currentFilter], 0.6)
+                end
+
+            elseif IsDisabledControlJustPressed(0, Config.Keybinds["filterPrev"]) then
+                if filters[currentFilter] then AnimpostfxStop(filters[currentFilter]) end
+                currentFilter = currentFilter - 1
+                if currentFilter < 1 then currentFilter = #filters end
+                if filters[currentFilter] then
+                    AnimpostfxPlay(filters[currentFilter])
+                    AnimpostfxSetStrength(filters[currentFilter], 0.6)
+                end
+
+            elseif IsDisabledControlPressed(0, Config.Keybinds["camUp"]) then
+                changeCamPosition(0, 0, 0.01)
+            elseif IsDisabledControlPressed(0, Config.Keybinds["camDown"]) then
+                changeCamPosition(0, 0, -0.01)
+            elseif IsDisabledControlPressed(0, Config.Keybinds["camLeft"]) then
+                changeCamPosition(0, -0.01, 0)
+            elseif IsDisabledControlPressed(0, Config.Keybinds["camRight"]) then
+                changeCamPosition(0, 0.01, 0)
+            elseif IsDisabledControlPressed(0, Config.Keybinds["camForward"]) then
+                changeCamPosition(-0.01, 0, 0)
+            elseif IsDisabledControlPressed(0, Config.Keybinds["camBack"]) then
+                changeCamPosition(0.01, 0, 0)
             end
             Wait(1)
         end
@@ -443,3 +484,67 @@ AddEventHandler('onResourceStop', function(resourceName)
     end
 end)
 
+-- Photographer NPC and blip spawning
+local photographerPeds = {}
+local photographerBlips = {}
+
+local function spawnPhotographerNPC(key, v)
+    if not v.npc then return end
+    local modelHash = GetHashKey(v.npc.model)
+    RequestModel(modelHash)
+    local timeout = 0
+    while not HasModelLoaded(modelHash) and timeout < 100 do
+        Citizen.Wait(10)
+        timeout = timeout + 1
+    end
+    if not HasModelLoaded(modelHash) then return end
+    local c = v.npc.coords
+    local npc = CreatePed(modelHash, c.x, c.y, c.z - 1, c.w, false, 0)
+    FreezeEntityPosition(npc, true)
+    Citizen.InvokeNative(0x283978A15512B2FE, npc, true)
+    SetEntityCanBeDamaged(npc, false)
+    SetEntityInvincible(npc, true)
+    SetBlockingOfNonTemporaryEvents(npc, true)
+    SetModelAsNoLongerNeeded(modelHash)
+    SetEntityAsMissionEntity(npc, true, true)
+    if v.npc.anim then
+        TaskStartScenarioInPlace(npc, GetHashKey(v.npc.anim), 0, true, false, false, false)
+    end
+    photographerPeds[key] = npc
+end
+
+local function createPhotographerBlip(key, v)
+    if not v.blip then return end
+    local c = v.promptCoords
+    local blip = N_0x554d9d53f696d002(1664425300, c.x, c.y, c.z)
+    Citizen.InvokeNative(0x0DF2B55F717DDB10, blip, false)
+    Citizen.InvokeNative(0x662D364ABF16DE2F, blip, joaat(v.blip.modifier))
+    SetBlipSprite(blip, v.blip.sprite, 1)
+    SetBlipScale(blip, v.blip.scale)
+    Citizen.InvokeNative(0x9CB1A1623062F402, blip, v.blip.name)
+    photographerBlips[key] = blip
+end
+
+Citizen.CreateThread(function()
+    Citizen.Wait(2000) -- wait for world to load
+    for k, v in pairs(Config.Photographers) do
+        if v.npc and not photographerPeds[k] then
+            spawnPhotographerNPC(k, v)
+        end
+        if v.blip and not photographerBlips[k] then
+            createPhotographerBlip(k, v)
+        end
+    end
+end)
+
+-- Clean up on resource stop (already handled above for IDCardNPC,
+-- this covers photographer peds/blips)
+AddEventHandler('onResourceStop', function(resourceName)
+    if GetCurrentResourceName() ~= resourceName then return end
+    for k, ped in pairs(photographerPeds) do
+        if DoesEntityExist(ped) then DeletePed(ped) end
+    end
+    for k, blip in pairs(photographerBlips) do
+        if DoesBlipExist(blip) then RemoveBlip(blip) end
+    end
+end)
