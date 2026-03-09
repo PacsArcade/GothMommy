@@ -16,64 +16,41 @@ $(document).ready(function () {
     var $acid  = $('#fl-acid');
     var pixelCanvas = document.getElementById('pixel-canvas');
     var pixelCtx    = pixelCanvas ? pixelCanvas.getContext('2d') : null;
-    var pixelAnim   = null;
 
     function clearFilters() {
         $solid.hide().css('background-color', '');
-        stopPixel();
         $pixel.hide();
+        if (pixelCtx) pixelCtx.clearRect(0, 0, pixelCanvas.width, pixelCanvas.height);
         $fog.hide();
         $acid.hide();
     }
 
     // -------------------------------------------------------
     // PIXELATED
-    // CEF can't read game framebuffer pixels, so we fake the
-    // low-res look:
-    //   - The #fl-pixel div has a semi-transparent sepia base
-    //     (rgba 0.45) so the game scene shows through dimly.
-    //   - On top of that, the canvas draws large solid-colour
-    //     blocks using warm sepia tones with ~0.55 opacity.
-    //   - The combination: game scene → sepia tint → chunky
-    //     colour blocks → result looks like a very low-res
-    //     warm mosaic over the scene.
-    //   - Every 120ms the block colours are re-randomised with
-    //     slight variation so the blocks shimmer/shift, adding
-    //     to the 8-bit feel.
+    // 32px blocks at low opacity so the game scene shows
+    // through clearly with a warm mosaic tint.
+    // Drawn ONCE (no shimmer animation) - stable mosaic.
     // -------------------------------------------------------
     function startPixel(bs) {
-        bs = bs || 18;  // default 18px blocks — visibly chunky
+        bs = bs || 32;
         var W = window.innerWidth;
         var H = window.innerHeight;
         var cols = Math.ceil(W / bs);
         var rows = Math.ceil(H / bs);
-
         pixelCanvas.width  = W;
         pixelCanvas.height = H;
-
-        function drawFrame() {
-            for (var y = 0; y < rows; y++) {
-                for (var x = 0; x < cols; x++) {
-                    // Warm sepia palette: r 35-90, g 20-55, b 5-20
-                    var r = 35  + Math.floor(Math.random() * 55);
-                    var g = 20  + Math.floor(Math.random() * 35);
-                    var b = 5   + Math.floor(Math.random() * 15);
-                    var a = (0.40 + Math.random() * 0.30).toFixed(2);
-                    pixelCtx.fillStyle = 'rgba(' + r + ',' + g + ',' + b + ',' + a + ')';
-                    pixelCtx.fillRect(x * bs, y * bs, bs, bs);
-                }
+        for (var y = 0; y < rows; y++) {
+            for (var x = 0; x < cols; x++) {
+                // Warm sepia tones, varied slightly per block
+                var r = 60  + Math.floor(Math.random() * 50);
+                var g = 35  + Math.floor(Math.random() * 30);
+                var b = 8   + Math.floor(Math.random() * 18);
+                var a = (0.22 + Math.random() * 0.18).toFixed(2); // 0.22-0.40
+                pixelCtx.fillStyle = 'rgba(' + r + ',' + g + ',' + b + ',' + a + ')';
+                pixelCtx.fillRect(x * bs, y * bs, bs - 1, bs - 1); // -1 creates a thin dark gap = block edge
             }
         }
-
-        drawFrame();
         $pixel.show();
-        // Animate — redraw every 150ms for the shimmer effect
-        pixelAnim = setInterval(drawFrame, 150);
-    }
-
-    function stopPixel() {
-        if (pixelAnim) { clearInterval(pixelAnim); pixelAnim = null; }
-        if (pixelCtx) pixelCtx.clearRect(0, 0, pixelCanvas.width, pixelCanvas.height);
     }
 
     function setFilter(d) {
@@ -90,46 +67,21 @@ $(document).ready(function () {
         } else if (type === 'acid') {
             $acid.show();
         } else if (type === 'pixel') {
-            startPixel(d.size || 18);
+            startPixel(d.size || 32);
         }
         $('#filter-label').text(d.name || 'None');
     }
 
     // -------------------------------------------------------
-    // Screenshot: fire F12 as a synthetic KeyboardEvent.
-    // RedM NUI intercepts keyboard events at the CEF/browser
-    // level — a synthesised keydown with the correct key code
-    // should reach the same intercept layer as a physical press.
-    // The Lua side also fires the native screenshot export.
-    // -------------------------------------------------------
-    function fireF12() {
-        var down = new KeyboardEvent('keydown', {
-            key: 'F12', code: 'F12',
-            keyCode: 123, which: 123,
-            bubbles: true, cancelable: true
-        });
-        var up = new KeyboardEvent('keyup', {
-            key: 'F12', code: 'F12',
-            keyCode: 123, which: 123,
-            bubbles: true, cancelable: true
-        });
-        document.dispatchEvent(down);
-        window.dispatchEvent(down);
-        setTimeout(function() {
-            document.dispatchEvent(up);
-            window.dispatchEvent(up);
-        }, 80);
-    }
-
-    // -------------------------------------------------------
-    // Countdown: use .visible class so display:flex is applied
-    // (plain .show() would set display:block, breaking centering)
+    // Countdown
+    // Use inline flex so digit is centred both axes.
     // -------------------------------------------------------
     function showCount(text) {
-        $('#cam-countdown').text(text).addClass('visible');
+        var $cd = $('#cam-countdown');
+        $cd.text(text).css('display', 'flex');
     }
     function hideCount() {
-        $('#cam-countdown').removeClass('visible').text('');
+        $('#cam-countdown').css('display', 'none').text('');
     }
 
     function doCountdownAndShoot() {
@@ -145,11 +97,11 @@ $(document).ready(function () {
             } else {
                 hideCount();
                 $flash.css({display:'block', opacity:1}).animate({opacity:0}, 500, function(){ $flash.hide(); });
-                // Lua native screenshot export
+                // Fire Lua native screenshot export
                 $.post('https://'+GetParentResourceName()+'/camShoot', JSON.stringify({}));
-                // Synthetic F12 press for client screenshot binding
-                fireF12();
-                $('#cam-saved-toast').stop(true).css({display:'block', opacity:1}).delay(2500).fadeOut(600);
+                // NOTE: F12 is intercepted by Steam before game/CEF.
+                // Players should use their own screenshot key.
+                // We do NOT show a misleading "Photo Saved" toast.
                 setTimeout(function(){ $('#cam-controls,#filter-bar').fadeIn(300); }, 700);
                 shootLocked = false;
             }
@@ -278,7 +230,6 @@ $(document).ready(function () {
                     cameraActive=false; clearFilters(); hideCount();
                     $('#camera-overlay').hide();
                     $('#filter-label').text('');
-                    $('#cam-saved-toast').stop(true).hide();
                 }
                 break;
         }
