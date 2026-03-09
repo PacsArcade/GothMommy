@@ -1,27 +1,35 @@
 Config = {}
 Config.Language = "en"
-Config.LicensePrefix = "GMRP" -- Prefix for license numbers e.g. GMRP-000123
+Config.LicensePrefix = "GMRP"
 Config.ShowIdcardCommand = "idcard"
 Config.TakeCardType = "sql" -- "item" or "sql" — sql = one unique ID per player
 
--- ─── Keybinds ──────────────────────────────────────────────────────────────
--- Arrow keys: Up=0x05CA7C52  Down=0xF5F8B500  Left=0xA65EBAB4  Right=0xDEB34313
--- Plus (+):   0x4B38BFCA   Minus (-): 0x2A3F6CCE
--- Comma (,):  0xCEFD9220   Period (.): 0x4B44B534
--- G: 0x760A9C6F  Backspace: 0x156F7119  Enter: 0xC7B5340A
+-- ─── Keybinds ──────────────────────────────────────────────────────────────────
+-- Each keybind has TWO values:
+--   [1] = PromptControlHash  used by PromptSetControlAction (shows key name in HUD prompts)
+--   [2] = RDR3 Control ID    used by IsDisabledControlPressed (actual input detection)
+--
+-- These are DIFFERENT systems in RDR3. Prompts use hashes; input detection uses integer IDs.
+--
+-- RDR3 Control IDs (verified):
+--   Up Arrow=172  Down Arrow=173  Left Arrow=174  Right Arrow=175
+--   Page Up=10    Page Down=11    (fallback zoom if +/- don't register)
+--   G=47   Backspace=177   Enter=18
+--   Numpad+/- don't have reliable IDs; using PgUp/PgDn for zoom
 Config.Keybinds = {
-    ["takephoto"]  = 0x760A9C6F, -- G
-    ["exit"]       = 0x156F7119, -- Backspace
-    ["camUp"]      = 0x05CA7C52, -- Up Arrow    (move cam up)
-    ["camDown"]    = 0xF5F8B500, -- Down Arrow  (move cam down)
-    ["camLeft"]    = 0xA65EBAB4, -- Left Arrow  (move cam left)
-    ["camRight"]   = 0xDEB34313, -- Right Arrow (move cam right)
-    ["camForward"] = 0x4B38BFCA, -- Plus (+)    (zoom in)
-    ["camBack"]    = 0x2A3F6CCE, -- Minus (-)   (zoom out)
-    ["printphoto"] = 0xC7B5340A, -- Enter
-    ["filterPrev"] = 0xCEFD9220, -- Comma (,)   (filter left)
-    ["filterNext"] = 0x4B44B534, -- Period (.)  (filter right)
-    ["takeidcard"] = 0x2CD5343E,
+    --              PromptHash    ControlID
+    ["takephoto"]  = { 0x760A9C6F,  47  },  -- G
+    ["exit"]       = { 0x156F7119,  177 },  -- Backspace
+    ["camUp"]      = { 0x05CA7C52,  172 },  -- Up Arrow
+    ["camDown"]    = { 0xF5F8B500,  173 },  -- Down Arrow
+    ["camLeft"]    = { 0xA65EBAB4,  174 },  -- Left Arrow
+    ["camRight"]   = { 0xDEB34313,  175 },  -- Right Arrow
+    ["camForward"] = { 0x446258B6,  10  },  -- Page Up   (zoom in)
+    ["camBack"]    = { 0x3C3DD371,  11  },  -- Page Down (zoom out)
+    ["printphoto"] = { 0xC7B5340A,  18  },  -- Enter
+    ["filterPrev"] = { 0x62800C92,  74  },  -- Left Bracket / prev  (control 74)
+    ["filterNext"] = { 0x8BDE7443,  75  },  -- Right Bracket / next (control 75)
+    ["takeidcard"] = { 0x2CD5343E,  51  },  -- E
 }
 
 Config.Locale = {
@@ -36,10 +44,10 @@ Config.Locale = {
         ["camDown"]     = "Cam Down [↓]",
         ["camLeft"]     = "Cam Left [←]",
         ["camRight"]    = "Cam Right [→]",
-        ["camForward"]  = "Zoom In [+]",
-        ["camBack"]     = "Zoom Out [-]",
-        ["filterPrev"]  = "Filter [,]",
-        ["filterNext"]  = "Filter [.]",
+        ["camForward"]  = "Zoom In [PgUp]",
+        ["camBack"]     = "Zoom Out [PgDn]",
+        ["filterPrev"]  = "Filter Prev [[",
+        ["filterNext"]  = "Filter Next []]",
         ["promptitle3"] = "Illegal Identity Card",
         ["takeidcard"]  = "Take Id Card",
         --- NOTIFY -----
@@ -62,24 +70,20 @@ Config.Locale = {
     },
 }
 
-Config.HideHud = function()
-    -- exports['fx-hud']:hideHud()
-end
-Config.ShowHud = function()
-    -- exports['fx-hud']:showHud()
-end
+Config.HideHud = function() end
+Config.ShowHud = function() end
 
 Config.Prices = {
-    printphoto = 5,   -- or false (free)
-    idcard     = 50,  -- or false (free)
-    illegal    = 100, -- or false (free)
+    printphoto = 5,
+    idcard     = 50,
+    illegal    = 100,
 }
 
 Config.AuthorizedJobs = { "sheriff", "lawenforcement", "marshal", "deputy" }
 
 Config.DeletePlayerDataCommand = "deleteidcard"
 Config.CheckIdCommand          = "checkid"
-Config.SelectPhotoTime         = 30 -- seconds
+Config.SelectPhotoTime         = 30
 Config.PrintPhotoItem          = "printphoto"
 Config.ManIdCardItem           = "man_idcard"
 Config.WomanIdCardItem         = "woman_idcard"
@@ -98,7 +102,6 @@ Config.Photographers = {
             coords   = vector4(-811.50, -1372.80, 44.07, 285.0),
             anim     = "WORLD_HUMAN_SMOKE_NERVOUS_STRESSED",
         },
-        -- 'blips' key (plural) matches the blip creation loop in client.lua
         blips = {
             name     = "ID Photo",
             sprite   = -1656531561,
@@ -116,7 +119,6 @@ Config.Religious = {
     "Jewish", "Muslim", "Atheist", "None"
 }
 
--- ─── Camera Filters ────────────────────────────────────────────────────────
 Config.CameraFilters = {
     { name = "None",         css = "none" },
     { name = "Sepia",        css = "sepia(1) contrast(1.1)" },
@@ -142,50 +144,39 @@ Config.IDCardNPC = {
             name = false,
         },
         timeSettings = {
-            open          = 8,
-            close         = 21,
-            blipmodifier  = "BLIP_MODIFIER_MP_COLOR_2",
+            open         = 8,
+            close        = 21,
+            blipmodifier = "BLIP_MODIFIER_MP_COLOR_2",
         },
     },
     ["IllegalCard"] = {
-        illegal    = true,
-        coords     = vector4(-813.2076, -1378.4711, 43.6373, 181.3653),
-        fakeLabel  = "Rhodes",
-        models     = "cs_brontesbutler",
-        distance   = 2,
-        blips      = false,
-        anims = {
-            dict = "WORLD_HUMAN_SMOKE_NERVOUS_STRESSED",
-            name = false,
-        },
+        illegal      = true,
+        coords       = vector4(-813.2076, -1378.4711, 43.6373, 181.3653),
+        fakeLabel    = "Rhodes",
+        models       = "cs_brontesbutler",
+        distance     = 2,
+        blips        = false,
+        anims        = { dict = "WORLD_HUMAN_SMOKE_NERVOUS_STRESSED", name = false },
         timeSettings = false,
     },
 }
 
 function Notify(data)
-    local text  = data.text   or "No message"
-    local time  = data.time   or 5000
-    local type  = data.type   or "info"
-    local dict  = data.dict
+    local text  = data.text  or "No message"
+    local time  = data.time  or 5000
+    local type  = data.type  or "info"
     local icon  = data.icon
-    local color = data.color  or 0
+    local color = data.color or 0
     local src   = data.source
-
     if IsDuplicityVersion() then
         if Framework == "VORP" then
-            if icon then
-                TriggerClientEvent('vorp:ShowAdvancedRightNotification', src, text, dict, icon, color, time)
-            else
-                TriggerClientEvent("vorp:TipBottom", src, text, time, type)
-            end
+            if icon then TriggerClientEvent('vorp:ShowAdvancedRightNotification', src, text, data.dict, icon, color, time)
+            else TriggerClientEvent("vorp:TipBottom", src, text, time, type) end
         end
     else
         if Framework == "VORP" then
-            if icon then
-                TriggerEvent("vorp:ShowAdvancedRightNotification", text, dict, icon, color, time)
-            else
-                TriggerEvent("vorp:TipBottom", text, time, type)
-            end
+            if icon then TriggerEvent("vorp:ShowAdvancedRightNotification", text, data.dict, icon, color, time)
+            else TriggerEvent("vorp:TipBottom", text, time, type) end
         end
     end
 end
@@ -193,13 +184,10 @@ end
 function Locale(key, subs)
     local translate = Config.Locale[Config.Language][key]
         and Config.Locale[Config.Language][key]
-        or "Config.Locale[" .. Config.Language .. "][" .. key .. "] doesn't exist"
-    subs = subs and subs or {}
+        or "[missing: "..key.."]"
+    subs = subs or {}
     for k, v in pairs(subs) do
-        local templateToFind = '%${' .. k .. '}'
-        local safeValue = tostring(v):gsub("%%", "%%%%")
-        translate = translate:gsub(templateToFind, safeValue)
+        translate = translate:gsub('%%${' .. k .. '}', tostring(v):gsub("%%","%%%%"))
     end
-    translate = tostring(translate):gsub("%%%%", "%%")
-    return tostring(translate)
+    return tostring(translate):gsub("%%%%","%%")
 end
