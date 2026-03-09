@@ -42,7 +42,7 @@ end
 AddEventHandler('onResourceStart', function(res)
     if GetCurrentResourceName() ~= res then return end
 
-    -- Load saved camps from DB
+    -- Load saved camps
     exports.oxmysql:execute('SELECT * FROM pac_camp', {}, function(rows)
         if rows then
             loadedCamps = {}
@@ -58,13 +58,14 @@ AddEventHandler('onResourceStart', function(res)
         end
     end)
 
-    -- -----------------------------------------------------------------------
-    -- Register usable items INSIDE onResourceStart with a short delay.
-    -- This ensures vorp_inventory has fully initialised its item cache before
-    -- we call RegisterUsableItem, which is why the bedroll showed no Use option.
-    -- -----------------------------------------------------------------------
+    -- Register usable items after VORP inventory is ready.
+    -- We hook vorp_inventory's own onResourceStart completion by waiting
+    -- for the vorp:inventory:ready export, falling back to a timed wait.
     Citizen.CreateThread(function()
-        Wait(500)  -- give vorp_inventory time to finish its startup SELECT * FROM items
+        -- Wait until vorp_inventory has run its own startup query.
+        -- The oversized-result warning appears after ~200ms on this server.
+        -- We wait 2000ms to be safe across restarts and cold boots.
+        Wait(2000)
 
         for itemName, _ in pairs(Config.Items) do
             VorpInv.RegisterUsableItem(itemName, function(data)
@@ -77,7 +78,7 @@ AddEventHandler('onResourceStart', function(res)
             end)
         end
 
-        -- Bedroll: no placement - just sleep anim + set respawn
+        -- Bedroll: sleep anim + set respawn point
         VorpInv.RegisterUsableItem('bedroll', function(data)
             local src  = data.source
             local User = VORPcore.getUser(src)
@@ -87,7 +88,9 @@ AddEventHandler('onResourceStart', function(res)
             TriggerClientEvent('pac_camp:client:useBedroll', src)
         end)
 
-        print('[pac-camp] Registered ' .. (function() local n=0; for _ in pairs(Config.Items) do n=n+1 end; return n end)() + 1 .. ' usable items (including bedroll)')
+        local count = 0
+        for _ in pairs(Config.Items) do count = count + 1 end
+        print('[pac-camp] Registered ' .. count + 1 .. ' usable items (including bedroll)')
     end)
 end)
 
@@ -194,7 +197,6 @@ AddEventHandler('pac_camp:server:openChest', function(campId)
     if not User then return end
     local Char = User.getUsedCharacter
     if not Char then return end
-
     exports.oxmysql:execute('SELECT * FROM pac_camp WHERE id = ?', {campId}, function(rows)
         if not rows or #rows == 0 then return end
         local row = rows[1]
@@ -202,9 +204,7 @@ AddEventHandler('pac_camp:server:openChest', function(campId)
         if isOwner then
             local prefix = "camp_storage_"..campId
             local cap = 1000
-            for _, v in pairs(Config.Chests) do
-                if v.object == row.item_model then cap = v.capacity; break end
-            end
+            for _, v in pairs(Config.Chests) do if v.object == row.item_model then cap = v.capacity; break end end
             registerStorage(prefix, Config.Text.StorageName, cap)
             Inv:openInventory(src, prefix)
         else
@@ -214,9 +214,7 @@ AddEventHandler('pac_camp:server:openChest', function(campId)
                 end
                 local prefix = "camp_storage_"..campId
                 local cap = 1000
-                for _, v in pairs(Config.Chests) do
-                    if v.object == row.item_model then cap = v.capacity; break end
-                end
+                for _, v in pairs(Config.Chests) do if v.object == row.item_model then cap = v.capacity; break end end
                 registerStorage(prefix, Config.Text.StorageName, cap)
                 Inv:openInventory(src, prefix)
             end)
@@ -234,14 +232,11 @@ AddEventHandler('pac_camp:server:toggleDoor', function(campId)
     if not User then return end
     local Char = User.getUsedCharacter
     if not Char then return end
-
     exports.oxmysql:execute('SELECT * FROM pac_camp WHERE id = ?', {campId}, function(rows)
         if not rows or #rows == 0 then return end
         local row = rows[1]
         local isOwner = (row.owner_identifier == Char.identifier and row.owner_charid == Char.charIdentifier)
-        if isOwner then
-            TriggerClientEvent('pac_camp:client:toggleDoor', -1, campId); return
-        end
+        if isOwner then TriggerClientEvent('pac_camp:client:toggleDoor', -1, campId); return end
         isCampMember(row.owner_identifier, row.owner_charid, Char.identifier, Char.charIdentifier, function(member)
             if not member then
                 VORPcore.NotifyLeft(src, Config.Text.Door, Config.Text.Dontdoor, "menu_textures", "cross", 2000, "COLOR_RED"); return
@@ -261,28 +256,20 @@ RegisterCommand(Config.Commands.CampInvite, function(source, args)
     local Char = User.getUsedCharacter
     if not Char then return end
     local tPid = tonumber(args[1])
-    if not tPid then
-        VORPcore.NotifyLeft(src, Config.Text.Camp, Config.Text.InviteUsage, "menu_textures", "cross", 3000, "COLOR_RED"); return
-    end
+    if not tPid then VORPcore.NotifyLeft(src, Config.Text.Camp, Config.Text.InviteUsage, "menu_textures", "cross", 3000, "COLOR_RED"); return end
     local tUser = VORPcore.getUser(tPid)
-    if not tUser then
-        VORPcore.NotifyLeft(src, Config.Text.Perms, Config.Text.Playerno, "menu_textures", "cross", 3000, "COLOR_RED"); return
-    end
+    if not tUser then VORPcore.NotifyLeft(src, Config.Text.Perms, Config.Text.Playerno, "menu_textures", "cross", 3000, "COLOR_RED"); return end
     local tChar = tUser.getUsedCharacter
-    if not tChar then
-        VORPcore.NotifyLeft(src, Config.Text.Perms, Config.Text.Playerno, "menu_textures", "cross", 3000, "COLOR_RED"); return
-    end
-    if tChar.charIdentifier == Char.charIdentifier then
-        VORPcore.NotifyLeft(src, Config.Text.Camp, Config.Text.InviteSelf, "menu_textures", "cross", 3000, "COLOR_RED"); return
-    end
+    if not tChar then VORPcore.NotifyLeft(src, Config.Text.Perms, Config.Text.Playerno, "menu_textures", "cross", 3000, "COLOR_RED"); return end
+    if tChar.charIdentifier == Char.charIdentifier then VORPcore.NotifyLeft(src, Config.Text.Camp, Config.Text.InviteSelf, "menu_textures", "cross", 3000, "COLOR_RED"); return end
     exports.oxmysql:execute(
         'INSERT IGNORE INTO pac_camp_members (owner_identifier,owner_charid,member_identifier,member_charid) VALUES (@oi,@oc,@mi,@mc)',
         {['@oi']=Char.identifier, ['@oc']=Char.charIdentifier, ['@mi']=tChar.identifier, ['@mc']=tChar.charIdentifier},
         function(result)
             local aff = result and (result.affectedRows or result.affected_rows or result.changes or 0)
             if aff and aff > 0 then
-                VORPcore.NotifyLeft(src, Config.Text.Camp, Config.Text.InviteSuccess:gsub("{name}", tChar.firstname.." "..tChar.lastname), "generic_textures", "tick", 3000, "COLOR_GREEN")
-                VORPcore.NotifyLeft(tPid, Config.Text.Camp, Config.Text.InviteReceived:gsub("{name}", Char.firstname.." "..Char.lastname), "generic_textures", "tick", 4000, "COLOR_GREEN")
+                VORPcore.NotifyLeft(src,  Config.Text.Camp, Config.Text.InviteSuccess:gsub("{name}", tChar.firstname.." "..tChar.lastname), "generic_textures", "tick", 3000, "COLOR_GREEN")
+                VORPcore.NotifyLeft(tPid, Config.Text.Camp, Config.Text.InviteReceived:gsub("{name}", Char.firstname.." "..Char.lastname),  "generic_textures", "tick", 4000, "COLOR_GREEN")
             else
                 VORPcore.NotifyLeft(src, Config.Text.Camp, Config.Text.AlreadyMember, "menu_textures", "cross", 3000, "COLOR_RED")
             end
@@ -300,25 +287,19 @@ RegisterCommand(Config.Commands.CampKick, function(source, args)
     local Char = User.getUsedCharacter
     if not Char then return end
     local tPid = tonumber(args[1])
-    if not tPid then
-        VORPcore.NotifyLeft(src, Config.Text.Camp, Config.Text.KickUsage, "menu_textures", "cross", 3000, "COLOR_RED"); return
-    end
+    if not tPid then VORPcore.NotifyLeft(src, Config.Text.Camp, Config.Text.KickUsage, "menu_textures", "cross", 3000, "COLOR_RED"); return end
     local tUser = VORPcore.getUser(tPid)
-    if not tUser then
-        VORPcore.NotifyLeft(src, Config.Text.Perms, Config.Text.Playerno, "menu_textures", "cross", 3000, "COLOR_RED"); return
-    end
+    if not tUser then VORPcore.NotifyLeft(src, Config.Text.Perms, Config.Text.Playerno, "menu_textures", "cross", 3000, "COLOR_RED"); return end
     local tChar = tUser.getUsedCharacter
-    if not tChar then
-        VORPcore.NotifyLeft(src, Config.Text.Perms, Config.Text.Playerno, "menu_textures", "cross", 3000, "COLOR_RED"); return
-    end
+    if not tChar then VORPcore.NotifyLeft(src, Config.Text.Perms, Config.Text.Playerno, "menu_textures", "cross", 3000, "COLOR_RED"); return end
     exports.oxmysql:execute(
         'DELETE FROM pac_camp_members WHERE owner_identifier=@oi AND owner_charid=@oc AND member_identifier=@mi AND member_charid=@mc',
         {['@oi']=Char.identifier, ['@oc']=Char.charIdentifier, ['@mi']=tChar.identifier, ['@mc']=tChar.charIdentifier},
         function(result)
             local aff = result and (result.affectedRows or result.affected_rows or result.changes or 0)
             if aff and aff > 0 then
-                VORPcore.NotifyLeft(src, Config.Text.Camp, Config.Text.KickSuccess:gsub("{name}", tChar.firstname.." "..tChar.lastname), "generic_textures", "tick", 3000, "COLOR_GREEN")
-                VORPcore.NotifyLeft(tPid, Config.Text.Camp, Config.Text.KickReceived:gsub("{name}", Char.firstname.." "..Char.lastname), "menu_textures", "cross", 4000, "COLOR_RED")
+                VORPcore.NotifyLeft(src,  Config.Text.Camp, Config.Text.KickSuccess:gsub("{name}", tChar.firstname.." "..tChar.lastname), "generic_textures", "tick", 3000, "COLOR_GREEN")
+                VORPcore.NotifyLeft(tPid, Config.Text.Camp, Config.Text.KickReceived:gsub("{name}", Char.firstname.." "..Char.lastname),  "menu_textures", "cross", 4000, "COLOR_RED")
             else
                 VORPcore.NotifyLeft(src, Config.Text.Camp, Config.Text.NotMember, "menu_textures", "cross", 3000, "COLOR_RED")
             end
@@ -327,7 +308,7 @@ RegisterCommand(Config.Commands.CampKick, function(source, args)
 end, false)
 
 -- -----------------------------------------------------------------------
--- /campwho
+-- /campwho  — shows owner status + invited members
 -- -----------------------------------------------------------------------
 RegisterCommand(Config.Commands.CampWho, function(source, args)
     local src  = source
@@ -339,8 +320,10 @@ RegisterCommand(Config.Commands.CampWho, function(source, args)
         'SELECT member_identifier, member_charid FROM pac_camp_members WHERE owner_identifier=@oi AND owner_charid=@oc',
         {['@oi']=Char.identifier, ['@oc']=Char.charIdentifier},
         function(rows)
+            -- Always show owner line first
+            local ownerLine = Config.Text.YouAreOwner
             if not rows or #rows == 0 then
-                VORPcore.NotifyLeft(src, Config.Text.Camp, Config.Text.NoMembers, "generic_textures", "tick", 3000, "COLOR_WHITE"); return
+                VORPcore.NotifyLeft(src, Config.Text.Camp, ownerLine.." "..Config.Text.NoMembers, "generic_textures", "tick", 4000, "COLOR_WHITE"); return
             end
             local names = {}
             for _, row in ipairs(rows) do
@@ -358,7 +341,7 @@ RegisterCommand(Config.Commands.CampWho, function(source, args)
                 end
                 if not found then table.insert(names, "Char #"..row.member_charid.." (offline)") end
             end
-            VORPcore.NotifyLeft(src, Config.Text.Camp, Config.Text.MemberList.." "..table.concat(names, ", "), "generic_textures", "tick", 6000, "COLOR_WHITE")
+            VORPcore.NotifyLeft(src, Config.Text.Camp, ownerLine.." "..Config.Text.MemberList.." "..table.concat(names, ", "), "generic_textures", "tick", 6000, "COLOR_WHITE")
         end
     )
 end, false)

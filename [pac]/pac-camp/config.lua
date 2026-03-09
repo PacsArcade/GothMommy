@@ -24,27 +24,23 @@ Config.AllowedTowns = {
 }
 
 Config.Commands = {
-    Camp         = "camp",        -- /camp  toggle pickup target
-    CampInvite   = "campinvite",  -- /campinvite [serverId]
-    CampKick     = "campkick",    -- /campkick [serverId]
-    CampWho      = "campwho",     -- /campwho
-    -- Legacy per-object share commands (kept for backward compat)
+    Camp         = "camp",
+    CampInvite   = "campinvite",
+    CampKick     = "campkick",
+    CampWho      = "campwho",
     Shareperms   = "shareperm",
     Unshareperms = "unshareperm",
 }
 
 Config.Text = {
-    -- Storage
     StorageName      = "Camp Storage",
     Chest            = "Chest",
     Dontchest        = "You are not a member of this camp",
-    -- Target mode
     Target           = "Target",
     Targeton         = "Target activated",
     Targetoff        = "Target deactivated",
     TargetActiveText  = "Use /",
     TargetActiveText1 = " to deactivate the target",
-    -- Camp general
     Camp             = "Camp",
     Place            = "Camp item placed!",
     Cancel           = "Placement cancelled.",
@@ -55,10 +51,8 @@ Config.Text = {
     chestfull        = "Empty the chest before picking it up!",
     NotFlat          = "Ground is too uneven here. Find a flatter spot.",
     SpeedLabel       = "Speed",
-    -- Door
     Door             = "Door",
     Dontdoor         = "You are not a member of this camp",
-    -- Permissions (legacy)
     Perms            = "Permissions",
     Sharecorret      = "Player ID",
     Dontowner        = "You are not the owner of this item",
@@ -71,7 +65,6 @@ Config.Text = {
     Playerpermi      = "ID of the player to give permission to",
     Shared           = "Share a chest or door with another player",
     Remove           = "Remove all permissions",
-    -- Camp membership
     InviteSuccess    = "You invited {name} to your camp",
     InviteReceived   = "You were invited to {name}'s camp",
     InviteUsage      = "Usage: /campinvite [serverID]",
@@ -81,29 +74,25 @@ Config.Text = {
     KickReceived     = "You were removed from {name}'s camp",
     KickUsage        = "Usage: /campkick [serverID]",
     NotMember        = "That player is not a member of your camp",
-    NoMembers        = "You have no camp members",
+    NoMembers        = "No members invited yet",
     MemberList       = "Camp members:",
-    -- Bedroll
     BedrollSet       = "Bedroll set. You will respawn here.",
-    -- Command descriptions (chat suggestions)
     CampCmdDesc      = "Toggle camp pickup mode",
     InviteDesc       = "Invite a player to your camp (grants chest/door access)",
     KickDesc         = "Remove a player from your camp",
     WhoDesc          = "List your current camp members",
+    YouAreOwner      = "You are the camp owner.",
 }
 
 Config.AdminGroups = { "admin", "moderator" }
 
+-- Placement panel: mouse-driven controls
 Config.ControlsPanel = {
     title = "Camp Placement",
     controls = {
-        "[Scroll]   - Speed",
-        "[Arrows]   - Move",
-        "[1/2]      - Rotate Z",
-        "[3/4]      - Rotate X",
-        "[5/6]      - Rotate Y",
-        "[7/8]      - Up/Down",
-        "[ENTER]    - Confirm",
+        "[Mouse]    - Move",
+        "[Scroll]   - Rotate",
+        "[E]        - Confirm",
         "[G]        - Cancel",
         "[F]        - Snap to Ground",
     }
@@ -117,30 +106,19 @@ Config.Promp = {
     Door      = "Door",
     Dooropen  = "Open/Close",
     Key = {
-        Pickut = 0xE30CD707, -- R
-        Chest  = 0x760A9C6F, -- G
-        Door   = 0x760A9C6F, -- G
+        Pickut = 0xE30CD707,
+        Chest  = 0x760A9C6F,
+        Door   = 0x760A9C6F,
     }
 }
 
+-- Keys used during placement (disable game controls for these)
 Config.Keys = {
-    moveForward   = 0x6319DB71,
-    moveBackward  = 0x05CA7C52,
-    moveLeft      = 0xA65EBAB4,
-    moveRight     = 0xDEB34313,
-    rotateLeftZ   = 0xE6F612E4,
-    rotateRightZ  = 0x1CE6D9EB,
-    rotateUpX     = 0x4F49CC4C,
-    rotateDownX   = 0x8F9F9E58,
-    rotateLeftY   = 0xAB62E997,
-    rotateRightY  = 0xA1FDE2A6,
-    moveUp        = 0xB03A913B,
-    moveDown      = 0x42385422,
-    placeOnGround = 0xB2F377E8,
-    cancelPlace   = 0x760A9C6F,
-    confirmPlace  = 0xC7B5340A,
-    increaseSpeed = 0xCC1075A7,
-    decreaseSpeed = 0xFD0F0C2C,
+    placeOnGround = 0xB2F377E8,  -- F
+    cancelPlace   = 0x760A9C6F,  -- G
+    confirmPlace  = 0xCEFD9220,  -- E
+    increaseSpeed = 0xCC1075A7,  -- scroll up  (rotation speed)
+    decreaseSpeed = 0xFD0F0C2C,  -- scroll down
 }
 
 Config.MaxSlopeAngle = 15.0
@@ -159,7 +137,6 @@ Config.Doors = {
 }
 
 -- NOTE: bedroll is NOT in Config.Items — it does not place a prop.
--- It triggers a sleep animation and sets the character's respawn point.
 Config.Items = {
     ["tent_trader"]             = { model = "mp005_s_posse_tent_trader07x",       veg = 10.0 },
     ["tent_bounty07"]           = { model = "mp005_s_posse_tent_bountyhunter07x", veg = 10.0 },

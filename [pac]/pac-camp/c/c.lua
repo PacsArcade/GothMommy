@@ -1,9 +1,4 @@
 -- pac-camp  c/c.lua  (client)  v2
--- New in v2:
---   * /campinvite, /campkick, /campwho chat suggestions
---   * Bedroll use: sleep animation + send respawn coords to server
---   * applyRespawn: teleport to bedroll position on spawn
-
 local campsEntities  = {}
 local dynamicDoors   = {}
 local campsData      = {}
@@ -43,6 +38,23 @@ local function RaycastFromCamera(distance)
     local _, hit, _, _, eHit = GetShapeTestResult(ray)
     if hit == 1 and DoesEntityExist(eHit) then return eHit end
     return nil
+end
+
+-- Raycast camera to ground, return world XYZ where camera ray hits ground
+local function RaycastToGround()
+    local co  = GetGameplayCamCoord()
+    local rot = GetGameplayCamRot(2)
+    local fwd = RotationToDirection(rot)
+    local far = co + fwd * 40.0
+    local ray = StartShapeTestRay(co.x,co.y,co.z, far.x,far.y,far.z, 1, PlayerPedId(), 0)
+    local _, hit, hitCoords, hitNormal = GetShapeTestResultIncludingMaterial(ray)
+    if hit == 1 then
+        return hitCoords.x, hitCoords.y, hitCoords.z, hitNormal
+    end
+    -- fallback: drop straight down from midpoint
+    local mx, my = (co.x+far.x)/2, (co.y+far.y)/2
+    local found, gz = GetGroundZFor_3dCoord(mx, my, co.z, false)
+    return mx, my, gz or co.z, vector3(0,0,1)
 end
 
 local function GetGroundInfo(x, y, z)
@@ -276,7 +288,7 @@ AddEventHandler('pac_camp:client:toggleDoor', function(campId)
 end)
 
 -- -----------------------------------------------------------------------
--- Placement mode
+-- Placement mode  (mouse-driven: ghost prop follows camera crosshair)
 -- -----------------------------------------------------------------------
 local function GetModelRadius(mHash)
     local mn, mx = GetModelDimensions(mHash)
@@ -308,61 +320,60 @@ AddEventHandler('pac_camp:client:placePropCamp', function(itemName)
     SetModelAsNoLongerNeeded(modelHash)
     PlaceObjectOnGroundProperly(tempObj)
 
-    local snapped = GetEntityCoords(tempObj, true)
-    local posX, posY, posZ = snapped.x, snapped.y, snapped.z
-    local rotX, rotY, rotZ = 0.0, 0.0, 0.0
-    local posStep   = 0.1
-    local rotStep   = posStep * 10
+    local posX, posY, posZ = ox, oy, oz
+    local rotZ      = 0.0   -- only Z rotation via scroll
     local snapToGround = true
-    local isPlacing = true
-    local dynRadius = GetModelRadius(modelHash)
-    local vegSphere = AddVeg(posX, posY, posZ, dynRadius)
+    local isPlacing    = true
+    local dynRadius    = GetModelRadius(modelHash)
+    local vegSphere    = AddVeg(posX, posY, posZ, dynRadius)
 
-    local function refreshUI()
-        SendNUIMessage({
-            action   = "showcamp",
-            title    = Config.ControlsPanel.title,
-            controls = Config.ControlsPanel.controls,
-            speed    = Config.Text.SpeedLabel..": "..string.format("%.2f", posStep)
-        })
-    end
-    refreshUI()
+    SendNUIMessage({
+        action   = "showcamp",
+        title    = Config.ControlsPanel.title,
+        controls = Config.ControlsPanel.controls,
+        speed    = ""
+    })
 
     CreateThread(function()
         while isPlacing do
             Wait(0)
-            for _, k in pairs(Config.Keys) do DisableControlAction(0, k, true) end
 
-            local moved = false
-            if IsDisabledControlJustPressed(0, Config.Keys.moveForward)  then posY=posY+posStep; moved=true end
-            if IsDisabledControlJustPressed(0, Config.Keys.moveBackward) then posY=posY-posStep; moved=true end
-            if IsDisabledControlJustPressed(0, Config.Keys.moveLeft)     then posX=posX-posStep; moved=true end
-            if IsDisabledControlJustPressed(0, Config.Keys.moveRight)    then posX=posX+posStep; moved=true end
-            if IsDisabledControlJustPressed(0, Config.Keys.moveUp)   then posZ=posZ+posStep; snapToGround=false; moved=true end
-            if IsDisabledControlJustPressed(0, Config.Keys.moveDown) then posZ=posZ-posStep; snapToGround=false; moved=true end
-            if IsDisabledControlJustPressed(0, Config.Keys.rotateRightZ) then rotZ=rotZ+rotStep; moved=true end
-            if IsDisabledControlJustPressed(0, Config.Keys.rotateLeftZ)  then rotZ=rotZ-rotStep; moved=true end
-            if IsDisabledControlJustPressed(0, Config.Keys.rotateUpX)    then rotX=rotX+rotStep; moved=true end
-            if IsDisabledControlJustPressed(0, Config.Keys.rotateDownX)  then rotX=rotX-rotStep; moved=true end
-            if IsDisabledControlJustPressed(0, Config.Keys.rotateRightY) then rotY=rotY+rotStep; moved=true end
-            if IsDisabledControlJustPressed(0, Config.Keys.rotateLeftY)  then rotY=rotY-rotStep; moved=true end
-            if IsDisabledControlJustPressed(0, Config.Keys.placeOnGround) then snapToGround=true; moved=true end
+            -- Block scroll and G/E so game doesn't consume them
+            DisableControlAction(0, Config.Keys.cancelPlace,   true)
+            DisableControlAction(0, Config.Keys.confirmPlace,  true)
+            DisableControlAction(0, Config.Keys.placeOnGround, true)
+            DisableControlAction(0, Config.Keys.increaseSpeed, true)
+            DisableControlAction(0, Config.Keys.decreaseSpeed, true)
+
+            -- Ghost prop follows camera ray to ground
+            local nx, ny, nz, norm = RaycastToGround()
+            if nx then
+                posX, posY = nx, ny
+                if snapToGround then
+                    posZ = nz
+                end
+            end
+
+            -- Scroll wheel rotates around Z axis
             if IsDisabledControlJustPressed(0, Config.Keys.increaseSpeed) then
-                posStep=math.min(posStep+0.01, 5.0); rotStep=posStep*10; refreshUI()
+                rotZ = rotZ + 15.0
             end
             if IsDisabledControlJustPressed(0, Config.Keys.decreaseSpeed) then
-                posStep=math.max(posStep-0.01, 0.01); rotStep=posStep*10; refreshUI()
+                rotZ = rotZ - 15.0
             end
-            if snapToGround then
-                local gz = GetGroundInfo(posX, posY, posZ)
-                if gz then posZ = gz end
+
+            -- F = snap to ground toggle
+            if IsDisabledControlJustPressed(0, Config.Keys.placeOnGround) then
+                snapToGround = true
             end
-            if moved then
-                SetEntityCoords(tempObj, posX, posY, posZ, true, true, true, false)
-                SetEntityRotation(tempObj, rotX, rotY, rotZ, 2, true)
-                if vegSphere then RemVeg(vegSphere) end
-                vegSphere = AddVeg(posX, posY, posZ, dynRadius)
-            end
+
+            -- Update ghost prop position
+            SetEntityCoords(tempObj, posX, posY, posZ, true, true, true, false)
+            SetEntityRotation(tempObj, 0.0, 0.0, rotZ, 2, true)
+            if vegSphere then RemVeg(vegSphere) end
+            vegSphere = AddVeg(posX, posY, posZ, dynRadius)
+
+            -- E = confirm
             if IsDisabledControlJustPressed(0, Config.Keys.confirmPlace) then
                 local _, surfNormal = GetGroundInfo(posX, posY, posZ)
                 local slope = GetSlopeAngle(surfNormal)
@@ -373,11 +384,13 @@ AddEventHandler('pac_camp:client:placePropCamp', function(itemName)
                     SendNUIMessage({action="hidecamp"})
                     if DoesEntityExist(tempObj) then DeleteObject(tempObj) end
                     if vegSphere then RemVeg(vegSphere); vegSphere=nil end
-                    TriggerServerEvent('pac_camp:server:savecampOwner', vector3(posX,posY,posZ), vector3(rotX,rotY,rotZ), itemName)
+                    TriggerServerEvent('pac_camp:server:savecampOwner', vector3(posX,posY,posZ), vector3(0.0,0.0,rotZ), itemName)
                     TriggerServerEvent("pac_camp:removeItem", itemName)
                     TriggerEvent("vorp:NotifyLeft", Config.Text.Camp, Config.Text.Place, "generic_textures", "tick", 2000, "COLOR_GREEN")
                 end
             end
+
+            -- G = cancel
             if IsDisabledControlJustPressed(0, Config.Keys.cancelPlace) then
                 isPlacing = false
                 SendNUIMessage({action="hidecamp"})
@@ -394,11 +407,10 @@ end)
 -- -----------------------------------------------------------------------
 RegisterNetEvent('pac_camp:client:useBedroll')
 AddEventHandler('pac_camp:client:useBedroll', function()
-    local ped    = PlayerPedId()
-    local coords = GetEntityCoords(ped)
+    local ped     = PlayerPedId()
+    local coords  = GetEntityCoords(ped)
     local heading = GetEntityHeading(ped)
 
-    -- Play sleep animation
     local dict = "amb_camp@world_human_sleep_ground@male@back@idle_a"
     RequestAnimDict(dict)
     local t = 0
@@ -411,21 +423,19 @@ AddEventHandler('pac_camp:client:useBedroll', function()
         StopAnimTask(ped, dict, "idle_a", 2.0)
     end
 
-    -- Set respawn
     TriggerServerEvent('pac_camp:server:setBedrollRespawn', {x=coords.x, y=coords.y, z=coords.z, w=heading})
 end)
 
--- On spawn, server may tell us to teleport to bedroll position
 RegisterNetEvent('pac_camp:client:applyRespawn')
 AddEventHandler('pac_camp:client:applyRespawn', function(coords)
-    Wait(1000)  -- small delay to let character fully spawn in
+    Wait(1000)
     local ped = PlayerPedId()
     SetEntityCoords(ped, coords.x, coords.y, coords.z, false, false, false, false)
     SetEntityHeading(ped, coords.w or 0.0)
 end)
 
 -- -----------------------------------------------------------------------
--- Town check: client sends current town name to server
+-- Town check
 -- -----------------------------------------------------------------------
 RegisterNetEvent('pac_camp:client:sendTownToServer')
 AddEventHandler('pac_camp:client:sendTownToServer', function(itemName)
@@ -451,18 +461,14 @@ end
 -- Chat suggestions
 -- -----------------------------------------------------------------------
 Citizen.CreateThread(function()
-    TriggerEvent('chat:addSuggestion', '/'..Config.Commands.Camp,
-        Config.Text.CampCmdDesc, {})
-    TriggerEvent('chat:addSuggestion', '/'..Config.Commands.CampInvite,
-        Config.Text.InviteDesc, {{name="serverID", help="Server ID of the player to invite"}})
-    TriggerEvent('chat:addSuggestion', '/'..Config.Commands.CampKick,
-        Config.Text.KickDesc, {{name="serverID", help="Server ID of the player to remove"}})
-    TriggerEvent('chat:addSuggestion', '/'..Config.Commands.CampWho,
-        Config.Text.WhoDesc, {})
+    TriggerEvent('chat:addSuggestion', '/'..Config.Commands.Camp,        Config.Text.CampCmdDesc, {})
+    TriggerEvent('chat:addSuggestion', '/'..Config.Commands.CampInvite,  Config.Text.InviteDesc,  {{name="serverID", help="Server ID of the player to invite"}})
+    TriggerEvent('chat:addSuggestion', '/'..Config.Commands.CampKick,    Config.Text.KickDesc,    {{name="serverID", help="Server ID of the player to remove"}})
+    TriggerEvent('chat:addSuggestion', '/'..Config.Commands.CampWho,     Config.Text.WhoDesc,     {})
 end)
 
 -- -----------------------------------------------------------------------
--- Cleanup on resource stop
+-- Cleanup
 -- -----------------------------------------------------------------------
 AddEventHandler('onResourceStop', function(res)
     if res ~= GetCurrentResourceName() then return end
