@@ -1,5 +1,5 @@
 -- =============================================================
-print("[pac-idcard] VERSION: 2026-03-09-v15 native-postfx-filters")
+print("[pac-idcard] VERSION: 2026-03-09-v16 filter-v3+camfix")
 -- =============================================================
 
 local idcardData    = false
@@ -12,35 +12,32 @@ local movements3    = {}
 local creating      = false
 local currentFilter = 1
 local activePostfx  = nil
+local activeTCM     = nil
 
 local exitCamera
 local setPhotographerHeading
 local cycleFilter
 local applyFilter
 
--- Native postfx effects available in RDR3
-local POSTFX = {
-    sepia        = "MP_Celeb_Win",
-    desaturate   = "DeathFailOut",
-    redtint      = "MP_Celeb_Win_Freemode",
-    purpletint   = "SwitchOpenNeutralFIB5",
-    greentint    = "MP_Celeb_Win",
-    blur         = "SwitchHUDIn",
-    none         = nil,
-}
-
 local function stopPostfx()
-    if activePostfx then
-        AnimpostfxStop(activePostfx)
-        activePostfx = nil
+    if activePostfx then AnimpostfxStop(activePostfx); activePostfx = nil end
+    if activeTCM then
+        ClearTimecycleModifier()
+        activeTCM = nil
     end
 end
 
-local function playPostfx(name, looped)
+local function playPostfx(name)
     stopPostfx()
+    if name then AnimpostfxPlay(name, 0, true); activePostfx = name end
+end
+
+local function setTCM(name, strength)
+    if activeTCM then ClearTimecycleModifier() end
     if name then
-        AnimpostfxPlay(name, 0, looped)
-        activePostfx = name
+        SetTimecycleModifier(name)
+        SetTimecycleModifierStrength(strength or 1.0)
+        activeTCM = name
     end
 end
 
@@ -125,6 +122,7 @@ RegisterNUICallback('camMove', function(data)
     end
     if not cam or not currentCamPos then return end
     local step = 0.15
+    -- NUM8=up, NUM2=down, NUM4=left, NUM6=right, NUM7=zoom_in(fwd), NUM9=zoom_out(back)
     if     dir == "up"    then currentCamPos.z = currentCamPos.z + step
     elseif dir == "down"  then currentCamPos.z = currentCamPos.z - step
     elseif dir == "left"  then currentCamPos.y = currentCamPos.y + step
@@ -191,23 +189,15 @@ applyFilter = function(idx)
     local f = Config.CameraFilters
     if not f or #f == 0 then return end
     local filter = f[idx] or f[1]
-
-    -- Stop any running postfx first
     stopPostfx()
-
-    -- Play native postfx if specified
-    if filter.postfx then
-        playPostfx(filter.postfx, true)
-    end
-
-    -- Send NUI message for overlay effects
+    if filter.postfx  then playPostfx(filter.postfx) end
+    if filter.tcm     then setTCM(filter.tcm, filter.tcmStrength) end
     SendNUIMessage({
         action     = 'setFilter',
         name       = filter.name,
         filterType = filter.filterType,
         r = filter.r, g = filter.g, b = filter.b, a = filter.a,
-        amount = filter.amount,
-        size   = filter.size,
+        amount = filter.amount, size = filter.size,
     })
 end
 
@@ -273,7 +263,13 @@ local function takePhoto(v, key)
     Wait(500); DoScreenFadeIn(1000)
     currentFilter = 1; applyFilter(currentFilter)
     SetNuiFocus(true, false)
-    SendNUIMessage({ action='showCameraOverlay', visible=true, pcx=pc.x, pcy=pc.y, pcz=targetZ })
+    -- Pass the player's world position and the cam FOV so NUI can compute
+    -- where the eyes appear on screen for the demon eyes filter
+    SendNUIMessage({
+        action='showCameraOverlay', visible=true,
+        pcx=pc.x, pcy=pc.y, pcz=targetZ,
+        camFov = v.camFov,
+    })
 end
 
 photographerPeds = {}

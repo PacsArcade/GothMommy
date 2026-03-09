@@ -27,14 +27,14 @@ Config.Locale = {
         ["takephoto"]   = "Take Photo  [G]",
         ["printphoto"]  = "Develop Film [Enter]",
         ["exit"]        = "Exit [Backspace]",
-        ["camUp"]       = "Cam Up [Up]",
-        ["camDown"]     = "Cam Down [Down]",
-        ["camLeft"]     = "Cam Left [Left]",
-        ["camRight"]    = "Cam Right [Right]",
-        ["camForward"]  = "Zoom In [PgUp]",
-        ["camBack"]     = "Zoom Out [PgDn]",
-        ["filterPrev"]  = "Filter Prev [[",
-        ["filterNext"]  = "Filter Next []]",
+        ["camUp"]       = "Cam Up [Num8]",
+        ["camDown"]     = "Cam Down [Num2]",
+        ["camLeft"]     = "Cam Left [Num4]",
+        ["camRight"]    = "Cam Right [Num6]",
+        ["camForward"]  = "Zoom In [Num7]",
+        ["camBack"]     = "Zoom Out [Num9]",
+        ["filterPrev"]  = "Filter Prev [Num1]",
+        ["filterNext"]  = "Filter Next [Num3]",
         ["takeidcard"]  = "Take Id Card",
         ["talkphoto"]   = "Talk to Photographer [E]",
         ["noimg"]          = "No picture ~COLOR_YELLOW~link~COLOR_WHITE~ entered !",
@@ -108,56 +108,35 @@ Config.Religious = {
 }
 
 --[[
-  Filter system v15:
-    filterType values (NUI overlay):
-      nil          = None
-      "solid"      = solid colour div over scene (rgba, opaque enough to tint)
-      "pixel"      = pixelate overlay
-      "acid"       = animated SVG warp + colour flood
-      "devil"      = dark vignette + red pulsing eye-glow
-      "blur"       = frosted white haze
+  Camera key layout (numpad):
+    NUM 8 = cam up       NUM 2 = cam down
+    NUM 4 = cam left     NUM 6 = cam right
+    NUM 7 = zoom in      NUM 9 = zoom out
+    NUM 1 = filter prev  NUM 3 = filter next
+    NUM 5 = reset
+    NUM 0 / Backspace / Escape = exit
+    Enter / NumpadEnter = take photo
 
-    postfx (optional Lua native postfx played simultaneously):
-      Any AnimpostfxPlay name string, e.g. "MP_Celeb_Win"
-      These apply to the actual 3D scene render.
+  filterType values:
+    nil          = None
+    "solid"      = translucent colour panel over scene
+    "demon"      = dark vignette + precise red eye-glow on face
+    "acid"       = cycling colour flood + SVG turbulence warp + CSS distort
+    "blur"       = frosted white haze (+ Lua postfx)
+    "pixel"      = low-res pixelated canvas grid
+
+  postfx = optional AnimpostfxPlay name (affects actual 3D render)
+  tcm    = optional SetTimecycleModifier name
 ]]
 Config.CameraFilters = {
     { name = "None" },
-    {
-        name       = "Sepia",
-        filterType = "solid",
-        r=100, g=60, b=10, a=0.35,
-        postfx     = "MP_Celeb_Win",
-    },
-    {
-        name       = "Thunderstorm",
-        filterType = "solid",
-        r=20, g=30, b=70, a=0.40,
-        postfx     = "DeathFailOut",
-    },
-    {
-        name       = "Blood Moon",
-        filterType = "solid",
-        r=140, g=0, b=0, a=0.38,
-    },
-    {
-        name       = "Devil Eyes",
-        filterType = "devil",
-    },
-    {
-        name       = "Acid Trip",
-        filterType = "acid",
-    },
-    {
-        name       = "Blurry",
-        filterType = "blur",
-        amount     = 6,
-    },
-    {
-        name       = "Pixelated",
-        filterType = "pixel",
-        size       = 10,
-    },
+    { name = "Sepia",        filterType = "solid",  r=110, g=65,  b=15,  a=0.42 },
+    { name = "Thunderstorm", filterType = "solid",  r=20,  g=28,  b=75,  a=0.45 },
+    { name = "Blood Moon",   filterType = "solid",  r=150, g=5,   b=5,   a=0.42 },
+    { name = "Demon Eyes",   filterType = "demon"  },
+    { name = "Acid Trip",    filterType = "acid"   },
+    { name = "Blurry",       filterType = "blur",   postfx = "SwitchHUDIn" },
+    { name = "Pixelated",    filterType = "pixel",  size = 8 },
 }
 
 Config.IDCardNPC = {
