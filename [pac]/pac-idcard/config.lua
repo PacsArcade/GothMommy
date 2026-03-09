@@ -79,21 +79,22 @@ Config.ShowDistance            = 1.5
   NAVMESH +1 RULE: Both CreatePed AND SetEntityCoords snap +1 in this building.
   Config z must be 1 unit below desired floor z.
 
-  Player desired floor z ≈ 44.278  →  config pedCoords.z = 43.228
-  NPC    desired floor z ≈ 44.073  →  config npc.coords.z = 43.073
+  Player desired floor z ~44.278  ->  config pedCoords.z = 43.228
+  NPC    desired floor z ~44.073  ->  config npc.coords.z = 43.073
 
   RDR heading: 0=North  90=West  180=South  270=East
-  Camera is at x=-812 (higher X). Player at x=-815 (lower X).
-  Player must face West (heading=90) to face the camera.
-  NPC default heading = 270 (faces East / door)
-  NPC photoHeading    = 90  (faces West / toward player)
+  Camera sits at higher X (~-812). Player at lower X (~-815).
+  Player heading=270 (East) faces AWAY from camera = back to camera.
+  Player heading=90  (West) faces TOWARD camera.
+  ** pedCoords.w = 270 was correct visually per earlier tests **
+  ** Reverted to 270 per player request - do not flip again    **
 ]]
 Config.Photographers = {
     ["Blackwater"] = {
         promptCoords   = vector4(-812.00, -1373.50, 44.07, 180.0),
         promptDistance = 3.5,
-        -- Player pose: heading 90 = faces West = faces the camera
-        pedCoords = vector4(-814.981, -1375.036, 43.228, 90.0),
+        -- heading 270 confirmed correct visually (player faces camera)
+        pedCoords = vector4(-814.981, -1375.036, 43.228, 270.0),
         camCoords = vector4(-812.721, -1375.099, 44.973, 0.0),
         camFov    = 45.0,
         npc = {

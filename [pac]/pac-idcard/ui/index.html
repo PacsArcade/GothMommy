@@ -15,7 +15,7 @@
         <style>
             * { box-sizing: border-box; margin: 0; padding: 0; }
 
-            /* ── Form theme ── */
+            /* Form theme */
             .create { background: rgba(10,6,2,0.92) !important; color: #e8d8b0 !important; }
             .create .label, .create span { color: #c8a96e !important; }
             .create input, .create select {
@@ -29,36 +29,35 @@
             .name-cont .label { margin-bottom:2px; }
             .name-cont input#name { margin-top:4px; }
 
-            /* ══════════════════════════════════════════════════════
-               CAMERA SYSTEM
-               Layer order (z-index):
-                 9980  #cam-filter-layer   — scene tint (filter here)
-                 9999  #camera-overlay     — HUD (isolated from filter)
-                10000  #cam-flash          — white-out on shutter
-               The overlay uses isolation:isolate so CSS filters on
-               #cam-filter-layer cannot bleed into the HUD elements.
-            ══════════════════════════════════════════════════════ */
+            /* ═══════════════════════════════════════
+               CAMERA SYSTEM — layer order:
+                 9980  #cam-filter-layer  (scene tint)
+                 9999  #camera-overlay   (HUD — isolated)
+                10000  #cam-flash        (shutter white-out)
+                10001  #cam-saved-toast  (bottom-right)
+               isolation:isolate on overlay + panel
+               prevents filter bleed into HUD text.
+            ═══════════════════════════════════════ */
 
-            /* Scene tint layer */
             #cam-filter-layer {
                 display: none;
                 position: fixed;
                 inset: 0;
                 pointer-events: none;
                 z-index: 9980;
-                /* needs a background for filter to be visible */
                 background: rgba(0,0,0,0.01);
                 transition: filter 0.25s ease;
+                /* DO NOT put isolation here — it must tint the scene */
             }
 
-            /* HUD wrapper — isolated so parent filter can't bleed in */
             #camera-overlay {
                 display: none;
                 position: fixed;
                 inset: 0;
                 pointer-events: none;
                 z-index: 9999;
-                isolation: isolate;   /* ← key fix: breaks filter inheritance */
+                /* isolation breaks filter inheritance from layer below */
+                isolation: isolate;
             }
 
             /* ── Filter bar (bottom centre) ── */
@@ -75,8 +74,6 @@
                 border-radius: 5px;
                 padding: 8px 24px;
                 pointer-events: none;
-                /* isolate so filter layer below doesn't tint text */
-                isolation: isolate;
             }
             .filter-key {
                 font-family: 'Georgia', serif;
@@ -98,66 +95,102 @@
                 text-align: center;
             }
 
-            /* ── Controls panel (right side) — shaded box ── */
+            /* ── Controls panel (right side) — numpad grid ── */
             #cam-controls {
                 position: absolute;
                 top: 50%;
                 right: 32px;
                 transform: translateY(-50%);
                 pointer-events: none;
-                isolation: isolate;
-                /* shaded grouping box */
-                background: rgba(10,6,2,0.78);
+                /* shaded box */
+                background: rgba(10,6,2,0.82);
                 border: 1px solid #8b6914;
                 border-radius: 6px;
-                padding: 16px 20px;
+                padding: 18px 22px 16px;
+                width: 260px;
             }
-            .cam-ctrl-row {
-                display: flex;
-                align-items: center;
-                justify-content: flex-end;
-                gap: 14px;
-                margin-bottom: 6px;
-            }
-            .cam-ctrl-row:last-child { margin-bottom: 0; }
-            .cam-ctrl-label {
+
+            /* Title */
+            .cam-ctrl-title {
                 font-family: 'Georgia', serif;
-                font-size: 15px;
-                color: #c8a96e;
-                text-shadow: 1px 1px 4px #000;
-                text-align: right;
-                text-transform: uppercase;
-                letter-spacing: 1px;
-            }
-            .cam-ctrl-key {
-                font-family: 'Georgia', serif;
-                font-size: 14px;
-                color: #f0e0b0;
-                background: rgba(20,12,2,0.90);
-                border: 1px solid #8b6914;
-                border-radius: 3px;
-                padding: 4px 12px;
-                min-width: 60px;
+                font-size: 20px;
+                font-weight: bold;
+                color: #d4a843;
                 text-align: center;
-                box-shadow: 0 1px 5px rgba(0,0,0,0.7);
-                letter-spacing: 1px;
+                letter-spacing: 4px;
+                text-transform: uppercase;
+                text-shadow: 0 0 10px rgba(212,168,67,0.6);
+                margin-bottom: 14px;
+                padding-bottom: 10px;
+                border-bottom: 1px solid rgba(139,105,20,0.5);
             }
+
+            /* Top action row: Take Photo + Exit side by side */
+            .cam-action-row {
+                display: flex;
+                justify-content: space-between;
+                gap: 10px;
+                margin-bottom: 14px;
+            }
+            .cam-action-cell {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                gap: 5px;
+                flex: 1;
+            }
+
             .cam-ctrl-divider {
                 height: 1px;
                 background: rgba(139,105,20,0.40);
-                margin: 7px 0;
+                margin: 10px 0;
             }
-            .cam-ctrl-section {
+
+            /* Numpad 3x3 grid */
+            .cam-numpad {
+                display: grid;
+                grid-template-columns: repeat(3, 1fr);
+                gap: 8px;
+            }
+            .cam-numpad-cell {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                gap: 5px;
+            }
+
+            /* Shared key style */
+            .cam-key {
                 font-family: 'Georgia', serif;
-                font-size: 16px;
-                color: #d4a843;
+                font-size: 13px;
+                color: #f0e0b0;
+                background: rgba(20,12,2,0.92);
+                border: 1px solid #8b6914;
+                border-radius: 4px;
+                padding: 6px 0;
+                width: 100%;
                 text-align: center;
-                letter-spacing: 3px;
+                letter-spacing: 1px;
+                box-shadow: 0 2px 6px rgba(0,0,0,0.6),
+                            inset 0 1px 0 rgba(212,168,67,0.15);
+            }
+            .cam-action-cell .cam-key {
+                font-size: 14px;
+                padding: 7px 0;
+            }
+
+            /* Label below each key */
+            .cam-key-label {
+                font-family: 'Georgia', serif;
+                font-size: 11px;
+                color: #c8a96e;
                 text-transform: uppercase;
-                margin-bottom: 10px;
-                text-shadow: 0 0 8px rgba(212,168,67,0.5);
-                border-bottom: 1px solid rgba(139,105,20,0.4);
-                padding-bottom: 8px;
+                letter-spacing: 1px;
+                text-align: center;
+                line-height: 1.2;
+            }
+            .cam-action-cell .cam-key-label {
+                font-size: 12px;
             }
 
             /* ── Countdown ── */
@@ -171,9 +204,7 @@
                 font-size: 140px;
                 color: #f0e0b0;
                 text-shadow: 0 0 60px rgba(212,168,67,0.8), 2px 2px 10px #000;
-                letter-spacing: 4px;
                 pointer-events: none;
-                /* frame around the number */
                 background: rgba(10,6,2,0.55);
                 border: 2px solid rgba(139,105,20,0.7);
                 border-radius: 8px;
@@ -184,7 +215,7 @@
             #cam-saved-toast {
                 display: none;
                 position: fixed;
-                bottom: 80px;   /* Steam screenshot notification sits ~60px up */
+                bottom: 80px;
                 right: 24px;
                 background: rgba(10,6,2,0.88);
                 border: 1px solid #8b6914;
@@ -214,85 +245,95 @@
     </head>
 <body>
 
-    <!-- Scene tint (filter applied here) -->
+    <!-- Scene tint (filter applied here, behind HUD) -->
     <div id="cam-filter-layer"></div>
 
     <!-- Camera flash -->
     <div id="cam-flash"></div>
 
-    <!-- Photo saved toast (outside overlay so filter doesn't affect it) -->
-    <div id="cam-saved-toast">📷 Photo Saved</div>
+    <!-- Photo saved toast (outside overlay so filter never touches it) -->
+    <div id="cam-saved-toast">&#128247; Photo Saved</div>
 
-    <!-- Camera HUD (isolated from filter layer) -->
+    <!-- Camera HUD (isolation:isolate keeps filter from bleeding in) -->
     <div id="camera-overlay">
 
-        <!-- Countdown (hidden during normal operation) -->
+        <!-- Countdown -->
         <div id="cam-countdown"></div>
 
-        <!-- Filter bar (bottom centre) -->
+        <!-- Filter bar bottom-centre -->
         <div id="filter-bar">
             <span class="filter-key">NUM 1</span>
             <span id="filter-label">None</span>
             <span class="filter-key">NUM 3</span>
         </div>
 
-        <!-- Controls panel (right side) -->
+        <!-- Controls panel right side -->
         <div id="cam-controls">
-            <div class="cam-ctrl-section">Photographer</div>
 
-            <div class="cam-ctrl-row">
-                <span class="cam-ctrl-label">Take Photo</span>
-                <span class="cam-ctrl-key">ENTER</span>
-            </div>
+            <!-- Title -->
+            <div class="cam-ctrl-title">Photographer</div>
 
-            <div class="cam-ctrl-divider"></div>
-
-            <div class="cam-ctrl-row">
-                <span class="cam-ctrl-label">Filter Next</span>
-                <span class="cam-ctrl-key">NUM 3</span>
-            </div>
-            <div class="cam-ctrl-row">
-                <span class="cam-ctrl-label">Filter Prev</span>
-                <span class="cam-ctrl-key">NUM 1</span>
+            <!-- Top row: Take Photo | Exit -->
+            <div class="cam-action-row">
+                <div class="cam-action-cell">
+                    <div class="cam-key">ENTER</div>
+                    <div class="cam-key-label">Take Photo</div>
+                </div>
+                <div class="cam-action-cell">
+                    <div class="cam-key">NUM 0</div>
+                    <div class="cam-key-label">Exit</div>
+                </div>
             </div>
 
             <div class="cam-ctrl-divider"></div>
 
-            <div class="cam-ctrl-row">
-                <span class="cam-ctrl-label">Cam Up</span>
-                <span class="cam-ctrl-key">NUM 8</span>
-            </div>
-            <div class="cam-ctrl-row">
-                <span class="cam-ctrl-label">Cam Down</span>
-                <span class="cam-ctrl-key">NUM 2</span>
-            </div>
-            <div class="cam-ctrl-row">
-                <span class="cam-ctrl-label">Cam Left</span>
-                <span class="cam-ctrl-key">NUM 4</span>
-            </div>
-            <div class="cam-ctrl-row">
-                <span class="cam-ctrl-label">Cam Right</span>
-                <span class="cam-ctrl-key">NUM 6</span>
-            </div>
-            <div class="cam-ctrl-row">
-                <span class="cam-ctrl-label">Zoom In</span>
-                <span class="cam-ctrl-key">NUM 7</span>
-            </div>
-            <div class="cam-ctrl-row">
-                <span class="cam-ctrl-label">Zoom Out</span>
-                <span class="cam-ctrl-key">NUM 9</span>
-            </div>
-            <div class="cam-ctrl-row">
-                <span class="cam-ctrl-label">Reset Cam</span>
-                <span class="cam-ctrl-key">NUM 5</span>
+            <!-- Numpad 3×3 grid
+                 Row 1:  7=Zoom In   8=Cam Up    9=Zoom Out
+                 Row 2:  4=Cam Left  5=Reset     6=Cam Right
+                 Row 3:  1=Flt Prev  2=Cam Down  3=Flt Next
+            -->
+            <div class="cam-numpad">
+                <!-- Row 1 -->
+                <div class="cam-numpad-cell">
+                    <div class="cam-key">NUM 7</div>
+                    <div class="cam-key-label">Zoom In</div>
+                </div>
+                <div class="cam-numpad-cell">
+                    <div class="cam-key">NUM 8</div>
+                    <div class="cam-key-label">Cam Up</div>
+                </div>
+                <div class="cam-numpad-cell">
+                    <div class="cam-key">NUM 9</div>
+                    <div class="cam-key-label">Zoom Out</div>
+                </div>
+                <!-- Row 2 -->
+                <div class="cam-numpad-cell">
+                    <div class="cam-key">NUM 4</div>
+                    <div class="cam-key-label">Cam Left</div>
+                </div>
+                <div class="cam-numpad-cell">
+                    <div class="cam-key">NUM 5</div>
+                    <div class="cam-key-label">Reset</div>
+                </div>
+                <div class="cam-numpad-cell">
+                    <div class="cam-key">NUM 6</div>
+                    <div class="cam-key-label">Cam Right</div>
+                </div>
+                <!-- Row 3 -->
+                <div class="cam-numpad-cell">
+                    <div class="cam-key">NUM 1</div>
+                    <div class="cam-key-label">Flt Prev</div>
+                </div>
+                <div class="cam-numpad-cell">
+                    <div class="cam-key">NUM 2</div>
+                    <div class="cam-key-label">Cam Down</div>
+                </div>
+                <div class="cam-numpad-cell">
+                    <div class="cam-key">NUM 3</div>
+                    <div class="cam-key-label">Flt Next</div>
+                </div>
             </div>
 
-            <div class="cam-ctrl-divider"></div>
-
-            <div class="cam-ctrl-row">
-                <span class="cam-ctrl-label">Exit</span>
-                <span class="cam-ctrl-key">NUM 0</span>
-            </div>
         </div>
     </div>
 
