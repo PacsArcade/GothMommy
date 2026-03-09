@@ -1,76 +1,59 @@
 local idcardData    = false
-local cam           = nil   -- nil not 0: in Lua 'not 0' is false!
+local cam           = nil   -- MUST be nil, not 0: 'not 0' is false in Lua!
 local currentCamPos = nil
 local movements     = {}
 local movements2    = {}
+local movements3    = {}  -- photographer prompts
 local creating      = false
 local currentFilter = 1
 
 -- ─── Prompt setup ───────────────────────────────────────────────────────────────
-local function createPrompts(keysTable, promptGroup)
-    local array = {}
-    for _, keyData in ipairs(keysTable) do
-        local m = PromptRegisterBegin()
-        PromptSetControlAction(m, GetHashKey(keyData[2][1]))
-        PromptSetText(m, CreateVarString(10, 'LITERAL_STRING', keyData[1]))
-        PromptSetEnabled(m, 1)
-        PromptSetVisible(m, 1)
-        PromptSetStandardMode(m, 1)
-        PromptSetGroup(m, promptGroup)
-        Citizen.InvokeNative(0xC5F428EE08FA7F2C, m, true)
-        PromptRegisterEnd(m)
-        PromptSetHoldMode(m, 500)
-        table.insert(array, m)
-    end
-    return array
+local function createPrompt(inputName, label, promptGroup, holdMs)
+    holdMs = holdMs or 500
+    local m = PromptRegisterBegin()
+    PromptSetControlAction(m, GetHashKey(inputName))
+    PromptSetText(m, CreateVarString(10, 'LITERAL_STRING', label))
+    PromptSetEnabled(m, 1)
+    PromptSetVisible(m, 1)
+    PromptSetStandardMode(m, 1)
+    PromptSetGroup(m, promptGroup)
+    Citizen.InvokeNative(0xC5F428EE08FA7F2C, m, true)
+    PromptRegisterEnd(m)
+    PromptSetHoldMode(m, holdMs)
+    return m
 end
 
-local promptGroup1 = GetRandomIntInRange(0, 0xffffff)
-local promptGroup2 = GetRandomIntInRange(0, 0xffffff)
-
-local keysTable1 = {
-    { Locale("takephoto"),  Config.Keybinds["takephoto"]  },
-    { Locale("printphoto"), Config.Keybinds["printphoto"] },
-    { Locale("exit"),       Config.Keybinds["exit"]       },
-    { Locale("camUp"),      Config.Keybinds["camUp"]      },
-    { Locale("camDown"),    Config.Keybinds["camDown"]    },
-    { Locale("camLeft"),    Config.Keybinds["camLeft"]    },
-    { Locale("camRight"),   Config.Keybinds["camRight"]   },
-    { Locale("camForward"), Config.Keybinds["camForward"] },
-    { Locale("camBack"),    Config.Keybinds["camBack"]    },
-    { Locale("filterPrev"), Config.Keybinds["filterPrev"] },
-    { Locale("filterNext"), Config.Keybinds["filterNext"] },
-}
-local keysTable2 = {
-    { Locale("takeidcard"), Config.Keybinds["takeidcard"] },
-}
+local promptGroup1 = GetRandomIntInRange(0, 0xffffff)  -- camera controls
+local promptGroup2 = GetRandomIntInRange(0, 0xffffff)  -- idcard NPC
+local promptGroup3 = GetRandomIntInRange(0, 0xffffff)  -- photographer NPC
 
 Citizen.CreateThread(function()
     Citizen.Wait(10)
-    movements  = createPrompts(keysTable1, promptGroup1)
-    movements2 = createPrompts(keysTable2, promptGroup2)
+    -- Camera controls (promptGroup1)
+    local pg1keys = {
+        { Config.Keybinds["takephoto"][1],  Locale("takephoto")  },
+        { Config.Keybinds["printphoto"][1], Locale("printphoto") },
+        { Config.Keybinds["exit"][1],       Locale("exit")       },
+        { Config.Keybinds["camUp"][1],      Locale("camUp")      },
+        { Config.Keybinds["camDown"][1],    Locale("camDown")    },
+        { Config.Keybinds["camLeft"][1],    Locale("camLeft")    },
+        { Config.Keybinds["camRight"][1],   Locale("camRight")   },
+        { Config.Keybinds["camForward"][1], Locale("camForward") },
+        { Config.Keybinds["camBack"][1],    Locale("camBack")    },
+        { Config.Keybinds["filterPrev"][1], Locale("filterPrev") },
+        { Config.Keybinds["filterNext"][1], Locale("filterNext") },
+    }
+    for _, kd in ipairs(pg1keys) do
+        movements[#movements+1] = createPrompt(kd[1], kd[2], promptGroup1)
+    end
+    -- IDCard NPC prompt (promptGroup2)
+    movements2[1] = createPrompt(Config.Keybinds["takeidcard"][1], Locale("takeidcard"), promptGroup2)
+    -- Photographer prompts (promptGroup3) - two prompts, same group
+    movements3[1] = createPrompt(Config.Keybinds["takeidcard"][1],  "Take Photo ($" .. (Config.Prices.printphoto or 5) .. ")", promptGroup3)
+    movements3[2] = createPrompt(Config.Keybinds["printphoto"][1], "Print Photo", promptGroup3)
 end)
 
 local function ctrl(key) return Config.Keybinds[key][2] end
-
--- ─── DrawText3D (RDR3-compatible) ──────────────────────────────────────────────────
--- RDR3 uses GetHudScreenPositionFromWorldPosition, not World3dToScreen2d
-local function DrawText3D(x, y, z, text)
-    local screenX, screenY = 0.0, 0.0
-    -- RDR3 native: returns screenX, screenY from world coords
-    screenX, screenY = Citizen.InvokeNative(0x34E82B6AA0590DE3, x, y, z, screenX, screenY)
-    if not screenX or screenX == 0.0 then return end
-    SetTextScale(0.0, 0.30)
-    SetTextFont(0)
-    SetTextProportional(1)
-    SetTextColour(255, 255, 255, 215)
-    SetTextDropShadow()
-    SetTextEdge(4, 0, 0, 0, 255)
-    SetTextEntry('STRING')
-    SetTextCentre(true)
-    AddTextComponentString(text)
-    DrawText(screenX, screenY - 0.03)
-end
 
 -- ─── NUI Callbacks ────────────────────────────────────────────────────────────
 RegisterNUICallback('close', function()
@@ -260,7 +243,6 @@ local function spawnPhotographerPed(key, v)
             break
         end
     end
-    -- Spawn at exact Z (no -1 offset) so the NPC stands on the floor properly
     local ped = CreatePed(hash, coords.x, coords.y, coords.z, coords.w, false, 0)
     if not DoesEntityExist(ped) then
         print("[pac-idcard] ERROR: Failed to create photographer ped for " .. key)
@@ -274,12 +256,9 @@ local function spawnPhotographerPed(key, v)
     Citizen.InvokeNative(0xD8B8CFD709214ACD, ped, true)
     SetModelAsNoLongerNeeded(hash)
     SetEntityAsMissionEntity(ped, true, true)
-    -- No scenario: let default idle animation play (standing)
-    -- Scenarios in RDR3 often crouch/sit unexpectedly depending on surface detection
-    -- ClearPedTasks ensures clean idle state
     ClearPedTasks(ped)
     photographerPeds[key] = ped
-    print("[pac-idcard] Spawned photographer '" .. key .. "' ped=" .. ped .. " (no scenario, clean idle)")
+    print("[pac-idcard] Spawned photographer '" .. key .. "' ped=" .. ped)
 end
 
 Citizen.CreateThread(function()
@@ -322,11 +301,11 @@ Citizen.CreateThread(function()
 end)
 
 -- ─── Photographer NPC interaction ────────────────────────────────────────────
--- [E]     -> enter camera mode
--- [Enter] -> open print photo UI
+-- Uses the same PromptHasHoldModeCompleted system as the IDCard NPC (known working)
+-- promptGroup3: [E] Take Photo | [Enter] Print Photo
 Citizen.CreateThread(function()
     while true do
-        local sleep = 1000
+        local sleep = 2000
         local myPos = GetEntityCoords(PlayerPedId())
 
         for k, v in pairs(Config.Photographers) do
@@ -336,18 +315,16 @@ Citizen.CreateThread(function()
                 local dist   = #(myPos - pedPos)
 
                 if dist < Config.TalkDistance and not cam then
-                    sleep = 0
+                    sleep = 1  -- run every ms (same as idcard NPC loop)
+                    PromptSetActiveGroupThisFrame(promptGroup3,
+                        CreateVarString(10, 'LITERAL_STRING', "Photographer"))
 
-                    local priceStr = Config.Prices.printphoto and (" ($" .. Config.Prices.printphoto .. ")") or ""
-                    DrawText3D(pedPos.x, pedPos.y, pedPos.z + 1.0,
-                        "[E] Take Photo  |  [Enter] Print Photo" .. priceStr)
-
-                    if IsDisabledControlJustPressed(0, ctrl("takeidcard")) then
+                    if movements3[1] and PromptHasHoldModeCompleted(movements3[1]) then
                         Config.HideHud()
                         takePhoto(v)
                         while cam do Wait(500) end
-                        sleep = 1000
-                    elseif IsDisabledControlJustPressed(0, ctrl("printphoto")) then
+                        sleep = 2000
+                    elseif movements3[2] and PromptHasHoldModeCompleted(movements3[2]) then
                         SetNuiFocus(true, true)
                         SendNUIMessage({ action = 'print' })
                     end
@@ -364,6 +341,8 @@ RegisterCommand("phototest", function()
     local myCoords = GetEntityCoords(PlayerPedId())
     print(string.format("[phototest] Player: x=%.2f y=%.2f z=%.2f  cam=%s",
         myCoords.x, myCoords.y, myCoords.z, tostring(cam)))
+    print(string.format("[phototest] movements3 ready: [1]=%s [2]=%s",
+        tostring(movements3[1] ~= nil), tostring(movements3[2] ~= nil)))
     for k, v in pairs(Config.Photographers) do
         local ped = photographerPeds[k]
         if ped and DoesEntityExist(ped) then

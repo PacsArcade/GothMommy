@@ -86,8 +86,8 @@ Config.Photographers = {
             model    = "mp_re_photography_females_01",
             hash     = 0x5730F05E,
             fallback = "cs_brontesbutler",
-            coords   = vector4(-810.48, -1372.56, 43.02, 180.0),
-            anim     = "WORLD_HUMAN_HANG_OUT_STREET",  -- verified upright RDR3 standing idle
+            -- 270 = facing west, toward the camera tripod and door
+            coords   = vector4(-810.48, -1372.56, 44.02, 270.0),
         },
         blips = {
             name     = "ID Photo",
