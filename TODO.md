@@ -4,6 +4,34 @@ This file tracks pending work across all scripts. Ordered by priority.
 
 ---
 
+## pac-camp
+
+### Bedroll — PENDING IN-GAME TEST
+- [ ] **Bedroll sleep animation** — bedroll is now a placeable prop (like chest/tent).
+      Proximity prompt "Sleep" appears when within 2m. Press E → sleep anim → respawn set.
+      Sleep uses `TaskStartScenarioInPlaceHash(ped, GetHashKey("WORLD_HUMAN_SLEEP_GROUND"), ...)`
+      wrapped in pcall. **Needs in-game test** to confirm scenario hash works in RedM.
+      If scenario fails silently, try anim dict fallback:
+      `amb_camp@world_human_sleep_ground@male@back@idle_a` / `base`.
+      Client log: watch F8 for `[pac-camp] sleep scenario started` vs fallback messages.
+- [ ] **Bedroll item in DB** — `bedroll` item still exists in `items` table with `usable=1`.
+      Once bedroll prop approach is confirmed working, the item row can stay (it places
+      the prop when used from inventory) or be removed. No action needed right now.
+- [ ] **campinvite / campkick / chest access via membership** — needs 2-player test session.
+
+### Completed ✅
+- [x] Mouse-driven ghost prop placement UI (smooth, tested working)
+- [x] Town blocking (AllowedTowns all false, tested working)
+- [x] Chest open/close + inventory persistence across restarts
+- [x] Camp membership system (pac_camp_members table)
+- [x] /campinvite, /campkick, /campwho commands (logic complete, single-player verified)
+- [x] Bedroll proximity prompt infrastructure (mirrors chest exactly)
+- [x] Bedroll respawn DB write (pac_camp_respawn, confirmed working)
+- [x] Respawn teleport on character spawn (vorp_character:spawnAChar)
+- [x] 19 camp item inventory images deployed to vorp_inventory
+
+---
+
 ## pac-idcard
 
 ### In-World Placement
@@ -27,22 +55,6 @@ This file tracks pending work across all scripts. Ordered by priority.
 ### Cleanup (VPS CLI)
 - [ ] Run `git rm` on 6 dead asset files (see `[pac]/pac-idcard/CLEANUP.md`)
       to recover ~4.75 MB.
-
----
-
-## pac-camp
-
-### Setup
-- [ ] Pull `feat/pac-camp` branch on VPS
-- [ ] Run `pac-camp-inject.sql` on `gothmommy_db`
-- [ ] Copy 18 PNGs from `[pac]/pac-camp/img/` → `[vorp]/vorp_inventory/html/img/`
-- [ ] Add `ensure uiprompt` and `ensure pac-camp` to server.cfg
-- [ ] Test: give yourself `campfire_01` via inventory and verify placement works
-
-### Known Issues / In Progress
-- [ ] Placement ground-snap was broken in original — fixed in pac-camp v1
-      (auto-snap on spawn + continuous snap + flatness check)
-- [ ] AllowedTowns blocks placement inside city limits — working as intended
 
 ---
 
