@@ -4,6 +4,16 @@ local VorpInv  = exports.vorp_inventory:vorp_inventoryApi()
 local Inv      = exports.vorp_inventory
 local loadedCamps = {}
 
+-- All item names we register as usable (so we can cleanly unregister on stop)
+local function getAllUsableItemNames()
+    local names = {}
+    for itemName, _ in pairs(Config.Items) do
+        table.insert(names, itemName)
+    end
+    table.insert(names, 'bedroll')
+    return names
+end
+
 local function registerStorage(prefix, name, limit)
     if not Inv:isCustomInventoryRegistered(prefix) then
         Inv:registerInventory({
@@ -37,6 +47,49 @@ local function isCampMember(ownerIdentifier, ownerCharid, memberIdentifier, memb
 end
 
 -- -----------------------------------------------------------------------
+-- Unregister all our usable items (called on stop AND before re-registering)
+-- Uses direct export to bypass the deprecated vorp_inventoryApi wrapper
+-- -----------------------------------------------------------------------
+local function unregisterAllUsableItems()
+    for _, name in ipairs(getAllUsableItemNames()) do
+        exports.vorp_inventory:unRegisterUsableItem(name)
+    end
+end
+
+-- -----------------------------------------------------------------------
+-- Register all usable items fresh
+-- -----------------------------------------------------------------------
+local function registerAllUsableItems()
+    -- Unregister first so restarts don't hit the "already registered" guard
+    unregisterAllUsableItems()
+
+    for itemName, _ in pairs(Config.Items) do
+        exports.vorp_inventory:registerUsableItem(itemName, function(data)
+            local src  = data.source
+            local User = VORPcore.getUser(src)
+            if not User then return end
+            local Char = User.getUsedCharacter
+            if not Char then return end
+            TriggerClientEvent('pac_camp:client:sendTownToServer', src, itemName)
+        end)
+    end
+
+    -- Bedroll: sleep anim + set respawn point
+    exports.vorp_inventory:registerUsableItem('bedroll', function(data)
+        local src  = data.source
+        local User = VORPcore.getUser(src)
+        if not User then return end
+        local Char = User.getUsedCharacter
+        if not Char then return end
+        TriggerClientEvent('pac_camp:client:useBedroll', src)
+    end)
+
+    local count = 0
+    for _ in pairs(Config.Items) do count = count + 1 end
+    print('[pac-camp] Registered ' .. count + 1 .. ' usable items (including bedroll)')
+end
+
+-- -----------------------------------------------------------------------
 -- Startup
 -- -----------------------------------------------------------------------
 AddEventHandler('onResourceStart', function(res)
@@ -58,40 +111,21 @@ AddEventHandler('onResourceStart', function(res)
         end
     end)
 
-    -- Register usable items after VORP inventory is ready.
-    -- We hook vorp_inventory's own onResourceStart completion by waiting
-    -- for the vorp:inventory:ready export, falling back to a timed wait.
+    -- Register usable items. No delay needed now because we unregister first,
+    -- bypassing vorp_inventory's "already registered" guard entirely.
     Citizen.CreateThread(function()
-        -- Wait until vorp_inventory has run its own startup query.
-        -- The oversized-result warning appears after ~200ms on this server.
-        -- We wait 2000ms to be safe across restarts and cold boots.
-        Wait(2000)
-
-        for itemName, _ in pairs(Config.Items) do
-            VorpInv.RegisterUsableItem(itemName, function(data)
-                local src  = data.source
-                local User = VORPcore.getUser(src)
-                if not User then return end
-                local Char = User.getUsedCharacter
-                if not Char then return end
-                TriggerClientEvent('pac_camp:client:sendTownToServer', src, itemName)
-            end)
-        end
-
-        -- Bedroll: sleep anim + set respawn point
-        VorpInv.RegisterUsableItem('bedroll', function(data)
-            local src  = data.source
-            local User = VORPcore.getUser(src)
-            if not User then return end
-            local Char = User.getUsedCharacter
-            if not Char then return end
-            TriggerClientEvent('pac_camp:client:useBedroll', src)
-        end)
-
-        local count = 0
-        for _ in pairs(Config.Items) do count = count + 1 end
-        print('[pac-camp] Registered ' .. count + 1 .. ' usable items (including bedroll)')
+        Wait(500)
+        registerAllUsableItems()
     end)
+end)
+
+-- -----------------------------------------------------------------------
+-- Cleanup on resource stop: unregister so next restart gets a clean slate
+-- -----------------------------------------------------------------------
+AddEventHandler('onResourceStop', function(res)
+    if GetCurrentResourceName() ~= res then return end
+    unregisterAllUsableItems()
+    print('[pac-camp] Unregistered all usable items')
 end)
 
 -- -----------------------------------------------------------------------
@@ -308,7 +342,7 @@ RegisterCommand(Config.Commands.CampKick, function(source, args)
 end, false)
 
 -- -----------------------------------------------------------------------
--- /campwho  — shows owner status + invited members
+-- /campwho — shows owner status + invited members
 -- -----------------------------------------------------------------------
 RegisterCommand(Config.Commands.CampWho, function(source, args)
     local src  = source
@@ -320,10 +354,9 @@ RegisterCommand(Config.Commands.CampWho, function(source, args)
         'SELECT member_identifier, member_charid FROM pac_camp_members WHERE owner_identifier=@oi AND owner_charid=@oc',
         {['@oi']=Char.identifier, ['@oc']=Char.charIdentifier},
         function(rows)
-            -- Always show owner line first
             local ownerLine = Config.Text.YouAreOwner
             if not rows or #rows == 0 then
-                VORPcore.NotifyLeft(src, Config.Text.Camp, ownerLine.." "..Config.Text.NoMembers, "generic_textures", "tick", 4000, "COLOR_WHITE"); return
+                VORPcore.NotifyLeft(src, Config.Text.Camp, ownerLine.."\n"..Config.Text.NoMembers, "generic_textures", "tick", 4000, "COLOR_WHITE"); return
             end
             local names = {}
             for _, row in ipairs(rows) do
@@ -341,7 +374,7 @@ RegisterCommand(Config.Commands.CampWho, function(source, args)
                 end
                 if not found then table.insert(names, "Char #"..row.member_charid.." (offline)") end
             end
-            VORPcore.NotifyLeft(src, Config.Text.Camp, ownerLine.." "..Config.Text.MemberList.." "..table.concat(names, ", "), "generic_textures", "tick", 6000, "COLOR_WHITE")
+            VORPcore.NotifyLeft(src, Config.Text.Camp, ownerLine.."\n"..Config.Text.MemberList.." "..table.concat(names, ", "), "generic_textures", "tick", 6000, "COLOR_WHITE")
         end
     )
 end, false)
