@@ -14,39 +14,21 @@ $(document).ready(function () {
     var $pixel = $('#fl-pixel');
     var $fog   = $('#fl-fog');
     var $acid  = $('#fl-acid');
-    var pixelCanvas = document.getElementById('pixel-canvas');
-    var pixelCtx    = pixelCanvas ? pixelCanvas.getContext('2d') : null;
 
     function clearFilters() {
-        $solid.hide().css('background','');
+        $solid.hide().css('background-color','');
         $pixel.hide();
-        if (pixelCtx) pixelCtx.clearRect(0,0,pixelCanvas.width,pixelCanvas.height);
         $fog.hide();
         $acid.hide();
     }
 
-    // Pixel: small canvas drawn at 1px-per-block, stretched via CSS
-    // to fill screen with image-rendering:pixelated
+    // Pixel: pure CSS approach - solid dark base + repeating grid lines.
+    // No canvas, no transparency gaps. Block size set via CSS custom property.
     function startPixel(bs) {
-        bs = Math.max(bs || 8, 4);
-        var W = window.innerWidth,  H = window.innerHeight;
-        var w = Math.ceil(W / bs),  h = Math.ceil(H / bs);
-        pixelCanvas.width  = w;
-        pixelCanvas.height = h;
-        // Warm dark base
-        pixelCtx.fillStyle = 'rgba(35,20,6,0.30)';
-        pixelCtx.fillRect(0, 0, w, h);
-        // Checker dither on top - lighter blocks show the scene
-        for (var y = 0; y < h; y++) {
-            for (var x = 0; x < w; x++) {
-                var v = ((x ^ y) & 1);
-                pixelCtx.fillStyle = v
-                    ? 'rgba(70,42,15,0.28)'
-                    : 'rgba(20,10,2,0.18)';
-                pixelCtx.fillRect(x, y, 1, 1);
-            }
-        }
-        $pixel.show();
+        bs = Math.max(bs || 10, 6);
+        $pixel
+            .css('--bs', bs + 'px')
+            .show();
     }
 
     function setFilter(d) {
@@ -55,7 +37,7 @@ $(document).ready(function () {
         if (!type) {
             // None
         } else if (type === 'solid') {
-            $solid.css('background',
+            $solid.css('background-color',
                 'rgba('+(d.r||0)+','+(d.g||0)+','+(d.b||0)+','+(d.a||0.40)+')');
             $solid.show();
         } else if (type === 'fog') {
@@ -63,9 +45,24 @@ $(document).ready(function () {
         } else if (type === 'acid') {
             $acid.show();
         } else if (type === 'pixel') {
-            startPixel(d.size || 8);
+            startPixel(d.size || 10);
         }
         $('#filter-label').text(d.name || 'None');
+    }
+
+    // Dispatch a real F12 KeyboardEvent into the document.
+    // RedM/CEF intercepts real key events - this synthetic dispatch
+    // should trigger the game's F12 screenshot binding.
+    function fireF12() {
+        var opts = {
+            key: 'F12', code: 'F12',
+            keyCode: 123, which: 123,
+            bubbles: true, cancelable: false
+        };
+        document.dispatchEvent(new KeyboardEvent('keydown', opts));
+        setTimeout(function() {
+            document.dispatchEvent(new KeyboardEvent('keyup', opts));
+        }, 80);
     }
 
     function doCountdownAndShoot() {
@@ -80,10 +77,12 @@ $(document).ready(function () {
                 setTimeout(showNext, 900);
             } else {
                 $cd.hide();
-                // White flash
+                // Flash
                 $flash.css({display:'block',opacity:1}).animate({opacity:0},500,function(){$flash.hide();});
-                // Tell Lua to fire the screenshot native
+                // Tell Lua to fire the native screenshot export
                 $.post('https://'+GetParentResourceName()+'/camShoot', JSON.stringify({}));
+                // Also fire F12 as a synthetic KeyboardEvent in CEF
+                fireF12();
                 $('#cam-saved-toast').stop(true).css({display:'block',opacity:1}).delay(2500).fadeOut(600);
                 setTimeout(function(){ $('#cam-controls,#filter-bar').fadeIn(300); }, 700);
                 shootLocked = false;
