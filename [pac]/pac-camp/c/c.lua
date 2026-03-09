@@ -404,6 +404,10 @@ end)
 
 -- -----------------------------------------------------------------------
 -- Bedroll: sleep animation + set respawn
+-- Three-strategy approach:
+--   1. Scenario hash (most reliable, uses built-in NPC behaviour)
+--   2. Anim dict TaskPlayAnim (fallback if scenario not available)
+--   3. Plain Wait (last resort - no visible anim but respawn still sets)
 -- -----------------------------------------------------------------------
 RegisterNetEvent('pac_camp:client:useBedroll')
 AddEventHandler('pac_camp:client:useBedroll', function()
@@ -411,18 +415,50 @@ AddEventHandler('pac_camp:client:useBedroll', function()
     local coords  = GetEntityCoords(ped)
     local heading = GetEntityHeading(ped)
 
-    local dict = "amb_camp@world_human_sleep_ground@male@back@idle_a"
-    RequestAnimDict(dict)
-    local t = 0
-    while not HasAnimDictLoaded(dict) and t < 100 do
-        Wait(50); t = t + 1
-    end
-    if HasAnimDictLoaded(dict) then
-        TaskPlayAnim(ped, dict, "idle_a", 2.0, -2.0, 5000, 1, 0, false, false, false)
-        Wait(5000)
-        StopAnimTask(ped, dict, "idle_a", 2.0)
+    print('[pac-camp] useBedroll: client event received, starting sleep sequence')
+
+    -- Strategy 1: scenario-based sleep (most reliable in RDR3)
+    local scenarioHash = GetHashKey("WORLD_HUMAN_SLEEP_GROUND")
+    local usedScenario = false
+
+    if IsTaskActive(ped, 0) == false then  -- ped is idle
+        print('[pac-camp] useBedroll: trying scenario WORLD_HUMAN_SLEEP_GROUND')
+        TaskStartScenarioInPlaceHash(ped, scenarioHash, 5000, true, 0, 0, false)
+        Wait(5500)
+        ClearPedTasksImmediately(ped)
+        usedScenario = true
+        print('[pac-camp] useBedroll: scenario complete')
     end
 
+    -- Strategy 2: anim dict fallback
+    if not usedScenario then
+        print('[pac-camp] useBedroll: ped busy, trying anim dict fallback')
+        local dict = "amb_camp@world_human_sleep_ground@male@back@idle_a"
+        print('[pac-camp] useBedroll: DoesAnimDictExist = ' .. tostring(DoesAnimDictExist(dict)))
+        if DoesAnimDictExist(dict) then
+            RequestAnimDict(dict)
+            local t = 0
+            while not HasAnimDictLoaded(dict) and t < 60 do
+                Wait(50); t = t + 1
+            end
+            if HasAnimDictLoaded(dict) then
+                print('[pac-camp] useBedroll: playing anim dict')
+                TaskPlayAnim(ped, dict, "idle_a", 2.0, -2.0, 5000, 1, 0, false, false, false)
+                Wait(5000)
+                StopAnimTask(ped, dict, "idle_a", 2.0)
+                RemoveAnimDict(dict)
+                print('[pac-camp] useBedroll: anim dict complete')
+            else
+                print('[pac-camp] useBedroll: anim dict failed to load, using plain wait')
+                Wait(3000)
+            end
+        else
+            print('[pac-camp] useBedroll: anim dict does not exist in this build, using plain wait')
+            Wait(3000)
+        end
+    end
+
+    print('[pac-camp] useBedroll: sending setBedrollRespawn to server')
     TriggerServerEvent('pac_camp:server:setBedrollRespawn', {x=coords.x, y=coords.y, z=coords.z, w=heading})
 end)
 
