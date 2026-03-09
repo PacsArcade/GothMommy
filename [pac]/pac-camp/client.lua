@@ -1,0 +1,3 @@
+-- MOVED: this file is no longer used.
+-- Client code lives at:  [pac]/pac-camp/c/c.lua
+-- fxmanifest.lua references c/c.lua

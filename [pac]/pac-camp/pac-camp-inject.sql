@@ -1,0 +1,2 @@
+-- MOVED: this file is no longer used.
+-- SQL injection lives at:  [pac]/pac-camp/sql/pac-camp-inject.sql
