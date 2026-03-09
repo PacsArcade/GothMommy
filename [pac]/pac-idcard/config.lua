@@ -8,24 +8,6 @@ Config.TakeCardType = "sql" -- "item" or "sql" — sql = one unique ID per playe
 -- Each keybind has TWO values:
 --   [1] = INPUT_* name string  — passed to GetHashKey() in createPrompts for correct HUD icon
 --   [2] = RDR3 Control ID      — used by IsDisabledControlPressed (actual input detection)
---
--- These are DIFFERENT systems in RDR3.
--- The INPUT_* name drives the icon displayed in the prompt widget.
--- The integer control ID drives the actual keypress detection.
---
--- Verified INPUT_* names → keys:
---   INPUT_FRONTEND_UP      = Up Arrow
---   INPUT_FRONTEND_DOWN    = Down Arrow
---   INPUT_FRONTEND_LEFT    = Left Arrow
---   INPUT_FRONTEND_RIGHT   = Right Arrow
---   INPUT_FRONTEND_CANCEL  = Backspace
---   INPUT_FRONTEND_ACCEPT  = Enter
---   INPUT_FRONTEND_OPTION  = G  ("interact with animal" default)
---   INPUT_FRONTEND_ENDSCREEN_ACCEPT = Page Up
---   INPUT_FRONTEND_SOCIAL_CLUB      = Page Down
---   INPUT_SELECT_QUICKSELECT_SIDEARMS_LEFT  = [ (control 74)
---   INPUT_SELECT_QUICKSELECT_SIDEARMS_RIGHT = ] (control 75)
---   INPUT_CONTEXT_Y = E
 Config.Keybinds = {
     --               INPUT_* name (for prompt icon)              ControlID (for input detection)
     ["takephoto"]  = { "INPUT_FRONTEND_OPTION",                  47  },  -- G
@@ -102,12 +84,13 @@ Config.ShowDistance            = 1.5
 Config.Photographers = {
     ["Blackwater"] = {
         promptCoords   = vector4(-810.48, -1372.56, 43.02, 104.9485),
-        promptDistance = 5,
+        promptDistance = 3.5,  -- reduced 30% from 5
         pedCoords      = vector4(-810.48, -1372.56, 43.02, 285.0),
         camCoords      = vector4(-814.40, -1374.85, 44.90, 86.48),
         camFov         = 60.0,
         npc = {
-            model    = "mp_npcambig_m_photogr",
+            model    = "mp_re_photography_females_01",  -- photographer NPC
+            hash     = 0x5730F05E,
             fallback = "cs_brontesbutler",
             coords   = vector4(-810.48, -1372.56, 43.02, 285.0),
             anim     = "WORLD_HUMAN_SMOKE_NERVOUS_STRESSED",
@@ -123,9 +106,10 @@ Config.Photographers = {
 }
 
 Config.PedSpawnDistance = 30
+-- Vampire Cult removed
 Config.Religious = {
     "Christian", "Buddhist", "Wiccan", "Pagan",
-    "Spiritualist", "Coven", "Vampire Cult",
+    "Spiritualist", "Coven",
     "Jewish", "Muslim", "Atheist", "None"
 }
 
@@ -145,7 +129,7 @@ Config.IDCardNPC = {
         distance = 3,
         blips = {
             name     = "IDENTITY PROCESS",
-            sprite   = 0x984E7CA9,  -- Doctor/scroll icon — distinct from photographer
+            sprite   = 0x984E7CA9,
             scale    = 0.6,
             modifier = "BLIP_MODIFIER_MP_COLOR_32",
         },

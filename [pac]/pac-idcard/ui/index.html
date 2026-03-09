@@ -12,9 +12,31 @@
         <script src="https://code.jquery.com/jquery-3.6.4.min.js"></script>
         <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
+        <style>
+            /* Darker form background so labels are readable */
+            .create {
+                background: rgba(10, 6, 2, 0.92) !important;
+                color: #e8d8b0 !important;
+            }
+            .create .label, .create span {
+                color: #c8a96e !important;
+            }
+            .create input, .create select {
+                background: rgba(30, 18, 5, 0.85) !important;
+                color: #f0e0b0 !important;
+                border-color: #6b4c20 !important;
+            }
+            .create select option {
+                background: #1a0e03;
+                color: #f0e0b0;
+            }
+            .create h1, .create h2 {
+                color: #d4a843 !important;
+            }
+        </style>
     </head>
 <body>
-    <!-- Camera filter overlay: sits over the game viewport during photo mode -->
+    <!-- Camera filter overlay -->
     <div id="camera-overlay" style="display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;pointer-events:none;z-index:9999;transition:filter 0.3s ease;">
         <div id="filter-label" style="position:absolute;bottom:60px;left:50%;transform:translateX(-50%);color:#fff;font-size:18px;font-family:serif;text-shadow:1px 1px 4px #000;letter-spacing:2px;opacity:0.85;"></div>
     </div>
@@ -28,16 +50,30 @@
         <h1>ID CARD</h1>
         <h2>To create an ID card, fill in the following information</h2>
         <img id="usaflag" src="/ui/assets/flag1899.png" alt="" srcset="">
+
         <div class="name-cont">
             <span class="label">NAME / SURNAME</span>
-            <input type="text" name="" id="name" value="Louis Cunnigham">
+            <input type="text" id="name" value="Louis Cunningham">
             <div class="line"></div>
         </div>
+
         <div class="city-cont">
-            <span class="label">Place of birth / Religious</span>
-            <img id="cityicon" src="/ui/assets/city.png" alt="" srcset="">
-            <input type="text" name="" id="cityname" value="Blackwater" disabled>
-            <img id="religiousicon" src="/ui/assets/cross.png" alt="" srcset="">
+            <span class="label">City of Birth / Religion</span>
+            <img id="cityicon" src="/ui/assets/city.png" alt="">
+            <select id="cityname">
+                <option value="Blackwater">Blackwater</option>
+                <option value="Valentine">Valentine</option>
+                <option value="Rhodes">Rhodes</option>
+                <option value="Saint Denis">Saint Denis</option>
+                <option value="Strawberry">Strawberry</option>
+                <option value="Annesburg">Annesburg</option>
+                <option value="Van Horn">Van Horn</option>
+                <option value="Emerald Ranch">Emerald Ranch</option>
+                <option value="Armadillo">Armadillo</option>
+                <option value="Tumbleweed">Tumbleweed</option>
+                <option value="Other">Other</option>
+            </select>
+            <img id="religiousicon" src="/ui/assets/cross.png" alt="">
             <select id="religious">
                 <option value="">-- Select --</option>
                 <option value="Christian">Christian</option>
@@ -46,7 +82,6 @@
                 <option value="Pagan">Pagan</option>
                 <option value="Spiritualist">Spiritualist</option>
                 <option value="Coven">Coven</option>
-                <option value="Vampire Cult">Vampire Cult</option>
                 <option value="Jewish">Jewish</option>
                 <option value="Muslim">Muslim</option>
                 <option value="Atheist">Atheist</option>
@@ -54,42 +89,71 @@
             </select>
             <div class="line"></div>
         </div>
+
         <div class="sex-cont">
             <span class="label">Sex</span>
             <span class="mantext">Man:</span>
-            <input type="checkbox" name="" id="sex-man" disabled>
+            <input type="checkbox" id="sex-man" disabled>
             <span class="womantext">Woman:</span>
-            <input type="checkbox" name="" id="sex-women" disabled>
+            <input type="checkbox" id="sex-women" disabled>
             <div class="line"></div>
         </div>
+
         <div class="age-cont">
             <span class="label">Date of Birth</span>
             <span class="height-label">Age:</span>
-            <input type="text" name="" id="ageinput" value="29" disabled>
+            <input type="text" id="ageinput" value="29" disabled>
             <input type="date" id="dateinput" min="1820-01-01" max="1899-12-31" />
             <div class="line"></div>
         </div>
+
         <div class="body-cont">
             <span class="label">Height / Weight</span>
             <span class="age-label">Height:</span>
-            <input type="text" name="" id="heightinput" value="5'1" disabled>
+            <input type="text" id="heightinput" value="5'1" disabled>
             <div class="height-tick"></div>
             <span class="weight-label">Weight:</span>
-            <input type="text" name="" id="weightinput" value="80kg">
+            <input type="text" id="weightinput" value="80kg">
             <div class="line"></div>
         </div>
+
         <div class="hair-cont">
             <span class="label">Hair / Eyes Color</span>
-            <img id="hairicon" src="/ui/assets/hairicon.png" alt="" srcset="">
-            <input type="text" name="" id="hair" value="Black">
-            <img id="eyeicon" src="/ui/assets/eyeicon.png" alt="" srcset="">
-            <input type="text" name="" id="eye" value="Blue">
+            <img id="hairicon" src="/ui/assets/hairicon.png" alt="">
+            <select id="hair">
+                <option value="Black">Black</option>
+                <option value="Dark Brown">Dark Brown</option>
+                <option value="Brown">Brown</option>
+                <option value="Auburn">Auburn</option>
+                <option value="Red">Red</option>
+                <option value="Strawberry Blonde">Strawberry Blonde</option>
+                <option value="Blonde">Blonde</option>
+                <option value="Dirty Blonde">Dirty Blonde</option>
+                <option value="Light Blonde">Light Blonde</option>
+                <option value="Grey">Grey</option>
+                <option value="White">White</option>
+                <option value="Bald">Bald</option>
+            </select>
+            <img id="eyeicon" src="/ui/assets/eyeicon.png" alt="">
+            <select id="eye">
+                <option value="Brown">Brown</option>
+                <option value="Dark Brown">Dark Brown</option>
+                <option value="Hazel">Hazel</option>
+                <option value="Green">Green</option>
+                <option value="Blue">Blue</option>
+                <option value="Light Blue">Light Blue</option>
+                <option value="Grey">Grey</option>
+                <option value="Amber">Amber</option>
+                <option value="Black">Black</option>
+            </select>
             <div class="line"></div>
         </div>
+
         <button id="submit" type="button">SUBMIT</button>
     </div>
+
     <div class="printphoto">
-        <img class="photo" src="https://i.hizliresim.com/950uitk.png" alt="" srcset="">
+        <img class="photo" src="https://i.hizliresim.com/950uitk.png" alt="">
         <div class="photo-frame"></div>
         <input type="text" name="link" id="link" placeholder="https://pacsarcade.org/idphotos/">
         <button class="preview">PREVIEW</button>
@@ -97,12 +161,12 @@
         <button class="close"></button>
     </div>
     <div class="photograph">
-        <img class="photo" src="https://i.hizliresim.com/950uitk.png" alt="" srcset="">
+        <img class="photo" src="https://i.hizliresim.com/950uitk.png" alt="">
         <div class="photo-frame"></div>
     </div>
     <div class="id-card">
-        <img class="playerimg" src="https://i.hizliresim.com/950uitk.png" alt="" srcset="">
-        <img class="frame" src="/ui/assets/frame.png" alt="" srcset="">
+        <img class="playerimg" src="https://i.hizliresim.com/950uitk.png" alt="">
+        <img class="frame" src="/ui/assets/frame.png" alt="">
         <span class="charid">NODATA</span>
         <span class="sex">NODATA</span>
         <span class="hair">NODATA</span>

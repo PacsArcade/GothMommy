@@ -25,7 +25,8 @@ $(document).ready(function () {
         }
         var sex = array.sex === "Female" ? "F" : "M";
         $(".charid").html(array.charid || "N/A");
-        $(".license").html(array.prev_license || `GMRP-${array.charid || "N/A"}`);
+        // Use licenseNumber if present, otherwise fall back to prev_license or charid
+        $(".license").html(array.licenseNumber || array.prev_license || ("GMRP-" + (array.charid || "N/A")));
         $(".sex").html(sex);
         $(".hair").html(array.hair || "N/A");
         $(".eyes").html(array.eye || "N/A");
@@ -79,9 +80,16 @@ $(document).ready(function () {
     function CreateIdCardSetData(data, illegal) {
         setIllegal = illegal;
         $("#name").val(data.name);
-        $("#cityname").val(data.city);
 
-        // Set religion dropdown
+        // City of birth dropdown
+        var city = data.city || "Blackwater";
+        if ($("#cityname option[value='" + city + "']").length) {
+            $("#cityname").val(city);
+        } else {
+            $("#cityname").val("Other");
+        }
+
+        // Religion dropdown
         var rel = data.religious || "";
         if ($("#religious option[value='" + rel + "']").length) {
             $("#religious").val(rel);
@@ -90,7 +98,7 @@ $(document).ready(function () {
         }
 
         $("#ageinput").val(data.age);
-        $("#weightinput").val(`${data.weight}KG`);
+        $("#weightinput").val(data.weight ? data.weight + "KG" : "80KG");
 
         if (data.sex === "Male") {
             $("#sex-man").prop("checked", true);
@@ -115,6 +123,22 @@ $(document).ready(function () {
 
         var heightMap = {0.85:"4'8",0.90:"4'9",0.95:"4'10",1.0:"5'0",1.05:"5'1",1.10:"5'2"};
         $("#heightinput").val(heightMap[data.height] || "5'0");
+
+        // Hair dropdown
+        var hair = data.hair || "Black";
+        if ($("#hair option[value='" + hair + "']").length) {
+            $("#hair").val(hair);
+        } else {
+            $("#hair").val("Black");
+        }
+
+        // Eye dropdown
+        var eye = data.eye || "Brown";
+        if ($("#eye option[value='" + eye + "']").length) {
+            $("#eye").val(eye);
+        } else {
+            $("#eye").val("Brown");
+        }
     }
 
     function showPrintPhoto(img) {

@@ -7,14 +7,11 @@ local creating      = false
 local currentFilter = 1
 
 -- ─── Prompt setup ──────────────────────────────────────────────────────────
--- Config.Keybinds[key] = { inputName, controlID }
--- inputName  -> GetHashKey(inputName) passed to PromptSetControlAction for correct HUD icon
--- controlID  -> used by IsDisabledControlPressed (actual input)
 local function createPrompts(keysTable, promptGroup)
     local array = {}
     for _, keyData in ipairs(keysTable) do
         local m = PromptRegisterBegin()
-        PromptSetControlAction(m, GetHashKey(keyData[2][1]))  -- [1] = INPUT_* name string
+        PromptSetControlAction(m, GetHashKey(keyData[2][1]))  -- INPUT_* name → hash → correct icon
         PromptSetText(m, CreateVarString(10, 'LITERAL_STRING', keyData[1]))
         PromptSetEnabled(m, 1)
         PromptSetVisible(m, 1)
@@ -31,9 +28,6 @@ end
 local promptGroup1 = GetRandomIntInRange(0, 0xffffff)
 local promptGroup2 = GetRandomIntInRange(0, 0xffffff)
 
--- Index: 1=takephoto 2=printphoto 3=exit
---        4=camUp 5=camDown 6=camLeft 7=camRight
---        8=camForward(zoom+) 9=camBack(zoom-) 10=filterPrev 11=filterNext
 local keysTable1 = {
     { Locale("takephoto"),  Config.Keybinds["takephoto"]  },
     { Locale("printphoto"), Config.Keybinds["printphoto"] },
@@ -57,7 +51,6 @@ Citizen.CreateThread(function()
     movements2 = createPrompts(keysTable2, promptGroup2)
 end)
 
--- Helper: get just the controlID (index [2]) from a keybind entry
 local function ctrl(key) return Config.Keybinds[key][2] end
 
 -- ─── NUI Callbacks ──────────────────────────────────────────────────────────
@@ -132,8 +125,6 @@ function GetClosestPlayer()
 end
 
 local function setActivePrompts(mode)
-    -- photo mode: show takephoto(1) + printphoto(2)
-    -- camera mode: show exit(3) + all movement/filter (4-11)
     local show = mode == "photo"
         and {true,true,false,false,false,false,false,false,false,false,false}
         or  {false,false,true,true,true,true,true,true,true,true,true}
@@ -169,7 +160,6 @@ local function moveCam(x, y, z)
     end
 end
 
--- ─── Camera exit helper — call from any exit path ──────────────────────────
 local function exitCamera()
     SendNUIMessage({ action = 'showCameraOverlay', visible = false })
     RenderScriptCams(false, false, 0, true, true)
@@ -227,6 +217,60 @@ local function takePhoto(v)
         end
     end)
 end
+
+-- ─── Photographer NPC spawn ─────────────────────────────────────────────────
+local photographerPeds = {}
+
+local function spawnPhotographerPed(key, v)
+    if photographerPeds[key] then return end
+    local npc   = v.npc
+    local coords = npc.coords
+    -- Try model string first, fall back to hash, then fallback model
+    local hash = npc.hash or GetHashKey(npc.model)
+    RequestModel(hash)
+    local t = 0
+    while not HasModelLoaded(hash) do
+        Citizen.Wait(10); t = t + 10
+        if t > 5000 then
+            if npc.fallback then
+                hash = GetHashKey(npc.fallback)
+                RequestModel(hash)
+            end
+            break
+        end
+    end
+    local ped = CreatePed(hash, coords.x, coords.y, coords.z - 1, coords.w, false, 0)
+    FreezeEntityPosition(ped, true)
+    Citizen.InvokeNative(0x283978A15512B2FE, ped, true)
+    SetEntityCanBeDamaged(ped, false)
+    SetEntityInvincible(ped, true)
+    SetBlockingOfNonTemporaryEvents(ped, true)
+    SetModelAsNoLongerNeeded(hash)
+    SetEntityAsMissionEntity(ped, true, true)
+    -- Play idle scenario
+    if npc.anim then
+        TaskStartScenarioInPlace(ped, GetHashKey(npc.anim), 0, true, false, false, false)
+    end
+    photographerPeds[key] = ped
+end
+
+Citizen.CreateThread(function()
+    while true do
+        local coords = GetEntityCoords(PlayerPedId())
+        for key, v in pairs(Config.Photographers) do
+            if v.npc then
+                local dist = #(coords - vector3(v.npc.coords.x, v.npc.coords.y, v.npc.coords.z))
+                if dist < Config.PedSpawnDistance and not photographerPeds[key] then
+                    spawnPhotographerPed(key, v)
+                elseif dist > Config.PedSpawnDistance + 10 and photographerPeds[key] then
+                    DeletePed(photographerPeds[key])
+                    photographerPeds[key] = nil
+                end
+            end
+        end
+        Wait(2000)
+    end
+end)
 
 -- ─── Photographer blips (created once on resource start) ───────────────────
 local function createPhotographerBlip(v)
@@ -382,6 +426,9 @@ AddEventHandler('onResourceStop', function(resourceName)
     if GetCurrentResourceName() ~= resourceName then return end
     for _, v in pairs(Config.Photographers) do
         if v.blipEntity then RemoveBlip(v.blipEntity) end
+    end
+    for key, ped in pairs(photographerPeds) do
+        if ped then DeletePed(ped) end
     end
     for _, v in pairs(Config.IDCardNPC) do
         if v.npcEntity  then DeletePed(v.npcEntity)   end

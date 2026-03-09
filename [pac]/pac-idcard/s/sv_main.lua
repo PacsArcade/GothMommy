@@ -138,6 +138,11 @@ RegisterNetEvent('fx-idcard:server:buyIdCard', function(data)
     -- Build license number with prefix
     local licenseNumber = Config.LicensePrefix .. "-" .. string.format("%06d", charid)
 
+    -- FIX: inject licenseNumber and charid into data before storing
+    -- Previously these were missing, causing GMRP-N/A on the displayed card
+    data.charid       = charid
+    data.licenseNumber = licenseNumber
+
     if Config.TakeCardType == "sql" then
         exports.oxmysql:execute("SELECT * FROM pac_idcard WHERE charid = ?", {charid}, function(result)
             if not result[1] then
