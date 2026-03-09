@@ -1,5 +1,5 @@
 -- ═══════════════════════════════════════════════════════════════
-print("[pac-idcard] VERSION: 2026-03-09-v12 svg-lens-filter+acid-drip")
+print("[pac-idcard] VERSION: 2026-03-09-v13 div-filter+title-fix+blur-pixel")
 -- ═══════════════════════════════════════════════════════════════
 
 local idcardData    = false
@@ -17,7 +17,6 @@ local setPhotographerHeading
 local cycleFilter
 local applyFilter
 
--- ─── Prompt helpers ─────────────────────────────────────────────────────────
 local function createPrompt(inputName, label, promptGroup, holdMs)
     holdMs = holdMs or 500
     local m = PromptRegisterBegin()
@@ -61,7 +60,6 @@ Citizen.CreateThread(function()
     movements3[2] = createPrompt(Config.Keybinds["printphoto"][1], "Develop Film ($"..developPrice..")", promptGroup3)
 end)
 
--- ─── NUI Callbacks ──────────────────────────────────────────────────────────
 RegisterNUICallback('close', function()
     SetNuiFocus(false, false)
     AnimpostfxStop("OJDominoBlur")
@@ -82,7 +80,6 @@ RegisterNUICallback('camShoot', function(data)
     Citizen.InvokeNative(0x3B96D87CB7DA1245, true)
 end)
 
--- ─── Camera movement ────────────────────────────────────────────────────────
 RegisterNUICallback('camMove', function(data)
     local dir = data.dir
     if dir == "exit" then
@@ -112,7 +109,6 @@ RegisterNUICallback('camMove', function(data)
     if data.pcx then PointCamAtCoord(cam, data.pcx, data.pcy, data.pcz) end
 end)
 
--- ─── Network Events ─────────────────────────────────────────────────────────
 RegisterNetEvent('fx-idcard:client:setData',    function(d) idcardData = d     end)
 RegisterNetEvent('fx-idcard:client:clearData',  function()  idcardData = false end)
 RegisterNetEvent('fx-idcard:client:updateData', function()
@@ -149,7 +145,6 @@ RegisterNetEvent("fx-idcard:client:ShowUi", function(typee, data)
     end
 end)
 
--- ─── Helpers ────────────────────────────────────────────────────────────────
 function GetClosestPlayer()
     local myPed    = PlayerPedId()
     local myId     = PlayerId()
@@ -169,7 +164,17 @@ applyFilter = function(idx)
     local f = Config.CameraFilters
     if not f or #f == 0 then return end
     local filter = f[idx] or f[1]
-    SendNUIMessage({ action = 'setFilter', css = filter.css, name = filter.name, filterType = filter.filterType })
+    SendNUIMessage({
+        action     = 'setFilter',
+        name       = filter.name,
+        filterType = filter.filterType,
+        r          = filter.r,
+        g          = filter.g,
+        b          = filter.b,
+        a          = filter.a,
+        amount     = filter.amount,
+        size       = filter.size,
+    })
 end
 
 cycleFilter = function(dir)
@@ -207,7 +212,6 @@ exitCamera = function(photographerKey, restoreHeading)
     end
 end
 
--- ─── Photo session ───────────────────────────────────────────────────────────
 local function takePhoto(v, key)
     DoScreenFadeOut(1000)
     Wait(1000)
@@ -224,7 +228,7 @@ local function takePhoto(v, key)
     _currentDefaultHeading = defaultHeading
 
     SetEntityCoords(ped, pc.x, pc.y, pc.z, false, false, false, false)
-    SetEntityHeading(ped, pc.w)   -- 270 confirmed correct
+    SetEntityHeading(ped, pc.w)
     FreezeEntityPosition(ped, true)
     SetPlayerControl(PlayerId(), false)
     Wait(800)
@@ -258,7 +262,6 @@ local function takePhoto(v, key)
     })
 end
 
--- ─── Photographer NPC spawn ──────────────────────────────────────────────────
 photographerPeds = {}
 
 local function spawnPhotographerPed(key, v)
@@ -319,27 +322,21 @@ Citizen.CreateThread(function()
     end
 end)
 
--- ─── Photographer blips ──────────────────────────────────────────────────────
-local function createPhotographerBlip(v)
-    local c    = v.blips.coords or vector3(v.promptCoords.x, v.promptCoords.y, v.promptCoords.z)
-    local blip = N_0x554d9d53f696d002(1664425300, c.x, c.y, c.z)
-    Citizen.InvokeNative(0x0DF2B55F717DDB10, blip, false)
-    Citizen.InvokeNative(0x662D364ABF16DE2F, blip, joaat(v.blips.modifier))
-    SetBlipSprite(blip, v.blips.sprite, 1)
-    SetBlipScale(blip, v.blips.scale)
-    Citizen.InvokeNative(0x9CB1A1623062F402, blip, v.blips.name)
-    return blip
-end
-
 Citizen.CreateThread(function()
     for k, v in pairs(Config.Photographers) do
         if v.blips and not v.blipEntity then
-            v.blipEntity = createPhotographerBlip(v)
+            local c    = v.blips.coords or vector3(v.promptCoords.x, v.promptCoords.y, v.promptCoords.z)
+            local blip = N_0x554d9d53f696d002(1664425300, c.x, c.y, c.z)
+            Citizen.InvokeNative(0x0DF2B55F717DDB10, blip, false)
+            Citizen.InvokeNative(0x662D364ABF16DE2F, blip, joaat(v.blips.modifier))
+            SetBlipSprite(blip, v.blips.sprite, 1)
+            SetBlipScale(blip, v.blips.scale)
+            Citizen.InvokeNative(0x9CB1A1623062F402, blip, v.blips.name)
+            v.blipEntity = blip
         end
     end
 end)
 
--- ─── Photographer approach ───────────────────────────────────────────────────
 Citizen.CreateThread(function()
     while true do
         local sleep = 2000
@@ -369,7 +366,6 @@ Citizen.CreateThread(function()
     end
 end)
 
--- ─── /phototest ─────────────────────────────────────────────────────────────
 RegisterCommand("phototest", function()
     local me = GetEntityCoords(PlayerPedId())
     print(string.format("[phototest] player x=%.3f y=%.3f z=%.3f heading=%.1f cam=%s",
@@ -388,7 +384,6 @@ RegisterCommand("phototest", function()
     end
 end, false)
 
--- ─── IDCard NPC ──────────────────────────────────────────────────────────────
 local function isOpen(s)
     if not s then return true end
     local h = GetClockHours()
@@ -427,16 +422,6 @@ local function spawnPed(v, coords)
     return npc
 end
 
-local function createBlip(v)
-    local blip = N_0x554d9d53f696d002(1664425300, v.coords.x, v.coords.y, v.coords.z)
-    Citizen.InvokeNative(0x0DF2B55F717DDB10, blip, false)
-    Citizen.InvokeNative(0x662D364ABF16DE2F, blip, joaat(v.blips.modifier))
-    SetBlipSprite(blip, v.blips.sprite, 1)
-    SetBlipScale(blip, v.blips.scale)
-    Citizen.InvokeNative(0x9CB1A1623062F402, blip, v.blips.name)
-    return blip
-end
-
 Citizen.CreateThread(function()
     while true do
         local coords = GetEntityCoords(PlayerPedId())
@@ -447,7 +432,15 @@ Citizen.CreateThread(function()
             elseif v.npcEntity and (dist > Config.PedSpawnDistance or not isOpen(v.timeSettings)) then
                 DeletePed(v.npcEntity); v.npcEntity = nil; v.canInteract = nil
             end
-            if v.blips and not v.blipEntity then v.blipEntity = createBlip(v) end
+            if v.blips and not v.blipEntity then
+                local blip = N_0x554d9d53f696d002(1664425300, v.coords.x, v.coords.y, v.coords.z)
+                Citizen.InvokeNative(0x0DF2B55F717DDB10, blip, false)
+                Citizen.InvokeNative(0x662D364ABF16DE2F, blip, joaat(v.blips.modifier))
+                SetBlipSprite(blip, v.blips.sprite, 1)
+                SetBlipScale(blip, v.blips.scale)
+                Citizen.InvokeNative(0x9CB1A1623062F402, blip, v.blips.name)
+                v.blipEntity = blip
+            end
             if v.blipEntity then
                 local mod = isOpen(v.timeSettings) and v.blips.modifier or v.timeSettings.blipmodifier
                 Citizen.InvokeNative(0x662D364ABF16DE2F, v.blipEntity, joaat(mod))

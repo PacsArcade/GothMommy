@@ -109,17 +109,22 @@ Config.Religious = {
 }
 
 --[[
-  filterType field (optional per filter):
-    nil / absent = standard CSS filter via SVG canvas
-    "acid"       = SVG feTurbulence drip + hue-rotate distortion
+  filterType values:
+    nil / absent = colour tint overlay (mix-blend-mode: multiply)
+    "overlay"    = semi-transparent colour wash (mix-blend-mode: overlay)
+    "acid"       = animated hue-rotate + SVG turbulence warp
+    "blur"       = backdrop-filter blur
+    "pixel"      = pixelated posterize effect via CSS
 ]]
 Config.CameraFilters = {
-    { name = "None",         css = "none" },
-    { name = "Sepia",        css = "sepia(1) contrast(1.1)" },
-    { name = "Thunderstorm", css = "grayscale(0.6) brightness(0.7) contrast(1.4) saturate(0.5)" },
-    { name = "Blood Moon",   css = "sepia(0.4) hue-rotate(-20deg) saturate(3) brightness(0.75) contrast(1.3)" },
-    { name = "Devil Eyes",   css = "sepia(0.2) hue-rotate(300deg) saturate(4) brightness(0.85) contrast(1.5)" },
-    { name = "Acid Trip",    css = "hue-rotate(90deg) saturate(8) brightness(1.1) contrast(1.4)", filterType = "acid" },
+    { name = "None" },
+    { name = "Sepia",        filterType = "tint",    r=112, g=66,  b=20,  a=0.45 },
+    { name = "Thunderstorm", filterType = "tint",    r=40,  g=55,  b=80,  a=0.55 },
+    { name = "Blood Moon",   filterType = "overlay", r=180, g=20,  b=20,  a=0.40 },
+    { name = "Devil Eyes",   filterType = "overlay", r=120, g=0,   b=160, a=0.35 },
+    { name = "Acid Trip",    filterType = "acid" },
+    { name = "Blurry",       filterType = "blur",    amount = 6 },
+    { name = "Pixelated",    filterType = "pixel",   size = 8 },
 }
 
 Config.IDCardNPC = {
