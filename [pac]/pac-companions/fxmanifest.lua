@@ -8,7 +8,6 @@ shared_scripts {
     'config.lua',
     'locale.lua',
     'locales/en.lua',
-    'locales/es.lua',
 }
 
 client_scripts {
