@@ -1,6 +1,6 @@
 -- ═══════════════════════════════════════════════════════════
--- VERSION STAMP - update this line to verify file is loaded
-print("[pac-idcard] VERSION: 2026-03-09-v6 NUI-keyboard-cam")
+-- VERSION STAMP
+print("[pac-idcard] VERSION: 2026-03-09-v7 z-fix+nui-focus-cam")
 -- ═══════════════════════════════════════════════════════════
 
 local idcardData    = false
@@ -75,8 +75,8 @@ RegisterNUICallback('createIdCard', function(data)
 end)
 
 -- ─── Camera movement via NUI keyboard ─────────────────────────────────────────
--- The NUI overlay catches keyboard events and posts them here.
--- This completely bypasses game input blocking during RenderScriptCams.
+-- The NUI overlay catches keydown events and posts them here via fetch.
+-- This bypasses game input blocking entirely during RenderScriptCams.
 RegisterNUICallback('camMove', function(data)
     local dir = data.dir
     if dir == "exit" then
@@ -91,7 +91,7 @@ RegisterNUICallback('camMove', function(data)
     if dir == "filter_prev" then cycleFilter(-1); return end
     if not cam or not currentCamPos then return end
     local step = 0.15
-    if dir == "up"    then currentCamPos.z = currentCamPos.z + step
+    if     dir == "up"    then currentCamPos.z = currentCamPos.z + step
     elseif dir == "down"  then currentCamPos.z = currentCamPos.z - step
     elseif dir == "left"  then currentCamPos.y = currentCamPos.y - step
     elseif dir == "right" then currentCamPos.y = currentCamPos.y + step
@@ -217,16 +217,15 @@ local function takePhoto(v, key)
     _currentPhotoKey       = key
     _currentDefaultHeading = defaultHeading
 
-    -- Move player to pose spot (SetEntityCoords uses exact z, no navmesh snap)
+    -- Move player to pose spot
+    -- pedCoords.z is set 1 unit below desired floor (navmesh snaps +1)
     SetEntityCoords(ped, pc.x, pc.y, pc.z, false, false, false, false)
     SetEntityHeading(ped, pc.w)
     FreezeEntityPosition(ped, true)
     SetPlayerControl(PlayerId(), false)
-
-    -- Wait for position to settle before building camera
     Wait(800)
 
-    -- Log where player actually landed
+    -- Log actual landed position
     local actualPos = GetEntityCoords(ped)
     print(string.format("[pac-idcard] photo pose: player landed at x=%.3f y=%.3f z=%.3f (target z=%.3f)",
         actualPos.x, actualPos.y, actualPos.z, pc.z))
@@ -235,18 +234,20 @@ local function takePhoto(v, key)
     cam = CreateCam("DEFAULT_SCRIPTED_CAMERA", true)
     currentCamPos = { x = cc.x, y = cc.y, z = cc.z }
     SetCamCoord(cam, cc.x, cc.y, cc.z)
-    local targetZ = actualPos.z + 0.7  -- aim at actual landed chest height
+    local targetZ = actualPos.z + 0.7  -- chest height based on actual landed z
     PointCamAtCoord(cam, pc.x, pc.y, targetZ)
     Citizen.InvokeNative(0x27666E5988D9D429, cam, v.camFov)
     SetCamActive(cam, true)
     RenderScriptCams(true, false, 0, true, true)
-    Wait(800)
+    Wait(500)
     DoScreenFadeIn(1000)
 
     currentFilter = 1
     applyFilter(currentFilter)
 
-    -- Send overlay ON + player chest target for re-aiming after nudge
+    -- Focus NUI so keyboard events reach the overlay
+    -- cursor=false so mouse doesn't appear over the photo
+    SetNuiFocus(true, false)
     SendNUIMessage({
         action  = 'showCameraOverlay',
         visible = true,

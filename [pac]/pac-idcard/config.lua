@@ -78,22 +78,26 @@ Config.ShowDistance            = 1.5
 --[[
   CONFIRMED COORDS from live /phototest walks
 
-  NPC floor = 44.073 (CreatePed adds +1, so config z = 43.073)
-  RDR entity heading: 0=North  90=West  180=South  270=East
+  NAVMESH +1 RULE: Both CreatePed AND SetEntityCoords snap up +1 in this building.
+  So ALL z values in config must be 1 unit BELOW the desired floor z.
 
-  NPC default (idle by cash register): heading=270 = faces East (toward door)
-  NPC photoHeading (during photo):     heading=90  = faces West (toward player at x=-814)
+  Desired floor z = 44.073 (confirmed by NPC landing)
+  Config z for NPC   = 43.073  (CreatePed snaps to 44.073) ✅
+  Config z for pedCoords = 43.278  (SetEntityCoords snaps to 44.278) ✅
 
-  Player pose: heading=270 = faces East (toward camera at x=-812)
-  Camera: PointCamAtCoord aims at player chest at startup; arrow keys nudge freely.
+  RDR heading: 0=North  90=West  180=South  270=East
+  NPC default heading  = 270 (faces East, toward door / cash register)
+  NPC photoHeading     = 90  (faces West, toward player at x=-814)
+  Player heading       = 270 (faces East, toward camera at x=-812)
 ]]
 Config.Photographers = {
     ["Blackwater"] = {
         promptCoords   = vector4(-812.00, -1373.50, 44.07, 180.0),
         promptDistance = 3.5,
 
-        -- Player stands here during photo (confirmed from /phototest)
-        pedCoords = vector4(-814.981, -1375.036, 44.278, 270.0),
+        -- Player pose spot.
+        -- z=43.278: SetEntityCoords snaps +1 in this building, lands at 44.278
+        pedCoords = vector4(-814.981, -1375.036, 43.278, 270.0),
 
         -- Camera position (confirmed from /phototest)
         camCoords = vector4(-812.721, -1375.099, 44.973, 0.0),
@@ -103,11 +107,9 @@ Config.Photographers = {
             model    = "mp_re_photography_females_01",
             hash     = 0x5730F05E,
             fallback = "cs_brontesbutler",
-            -- z=43.073: CreatePed snaps +1 to 44.073 in this building
-            -- coords.w = default idle heading = 270 (faces East, toward cash register / door)
+            -- z=43.073: CreatePed snaps +1, lands at 44.073
             coords      = vector4(-811.771, -1373.614, 43.073, 270.0),
-            -- photoHeading = heading used DURING photo session
-            -- 90 = faces West = faces the player standing at x=-814
+            -- heading during photo session: 90 = faces West = toward player
             photoHeading = 90.0,
         },
         blips = {
