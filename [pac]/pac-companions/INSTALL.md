@@ -10,7 +10,7 @@ Modified for: Goth Mommy RP (PacsArcade) — VORP framework
 - `Config.RaiseAnimal` = `false` — pets spawn fully grown
 - `Config.NotifyWhenHungry` = `false` — no hunger notifications
 - `Config.FeedInterval` = `99999` — feeding effectively disabled
-- XP set to `Config.FullGrownXp` on purchase and load so pets have all abilities immediately
+- XP set to `Config.FullGrownXp` on purchase and load so all abilities unlock immediately
 - Server rewritten to VORP-only (redem blocks removed)
 - Uses `oxmysql` via `exports.ghmattimysql` (matches server standard)
 
@@ -22,9 +22,21 @@ The two client files are stubs. Before testing you must copy:
 These are framework-agnostic and can be dropped in as-is.
 
 ## Database
-Run `sql/companions.sql` against `gothmommy_db`:
+**.sql files are gitignored** — run this manually against `gothmommy_db`:
+
+```sql
+CREATE TABLE IF NOT EXISTS `companions` (
+  `identifier`     varchar(40)  NOT NULL,
+  `charidentifier` int          NOT NULL DEFAULT '0',
+  `dog`            varchar(255) NOT NULL,
+  `skin`           int          NOT NULL DEFAULT '0',
+  `xp`             int                   DEFAULT '0'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3;
+```
+
+Connect and run:
 ```bash
-mysql -h amp.pacsarcade.net -P 3307 -u pacbot -p gothmommy_db < sql/companions.sql
+mysql -h amp.pacsarcade.net -P 3307 -u pacbot -p gothmommy_db
 ```
 
 ## server.cfg
