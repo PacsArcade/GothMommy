@@ -5,11 +5,7 @@ Config.ShowIdcardCommand = "idcard"
 Config.TakeCardType = "sql" -- "item" or "sql" — sql = one unique ID per player
 
 -- ─── Keybinds ──────────────────────────────────────────────────────────────────
--- Each keybind has TWO values:
---   [1] = INPUT_* name string  — passed to GetHashKey() in createPrompts for correct HUD icon
---   [2] = RDR3 Control ID      — used by IsDisabledControlPressed (actual input detection)
 Config.Keybinds = {
-    --               INPUT_* name (for prompt icon)              ControlID (for input detection)
     ["takephoto"]  = { "INPUT_FRONTEND_OPTION",                  47  },  -- G
     ["exit"]       = { "INPUT_FRONTEND_CANCEL",                  177 },  -- Backspace
     ["camUp"]      = { "INPUT_FRONTEND_UP",                      172 },  -- Up Arrow
@@ -32,16 +28,17 @@ Config.Locale = {
         ["takephoto"]   = "Take Photo  [G]",
         ["printphoto"]  = "Print Photo [Enter]",
         ["exit"]        = "Exit [Backspace]",
-        ["camUp"]       = "Cam Up [↑]",
-        ["camDown"]     = "Cam Down [↓]",
-        ["camLeft"]     = "Cam Left [←]",
-        ["camRight"]    = "Cam Right [→]",
+        ["camUp"]       = "Cam Up [\xe2\x86\x91]",
+        ["camDown"]     = "Cam Down [\xe2\x86\x93]",
+        ["camLeft"]     = "Cam Left [\xe2\x86\x90]",
+        ["camRight"]    = "Cam Right [\xe2\x86\x92]",
         ["camForward"]  = "Zoom In [PgUp]",
         ["camBack"]     = "Zoom Out [PgDn]",
         ["filterPrev"]  = "Filter Prev [[",
         ["filterNext"]  = "Filter Next []]",
         ["promptitle3"] = "Illegal Identity Card",
         ["takeidcard"]  = "Take Id Card",
+        ["talkphoto"]   = "Talk to Photographer [E]",
         --- NOTIFY -----
         ["noimg"]          = "No picture ~COLOR_YELLOW~link~COLOR_WHITE~ entered !",
         ["successprint"]   = "The photo has been added to your inventory, you can view it with a ~COLOR_YELLOW~double click",
@@ -52,7 +49,7 @@ Config.Locale = {
         ["nodata"]         = "You don't have an identity !",
         ["nomoney"]        = "You don't have enough money. Fee : ~COLOR_YELLOW~${money}",
         ["successidcard"]  = "Your ID card is attached. You can now show your ID",
-        ["useitem"]        = "Use your photo from inventory within ~COLOR_YELLOW~${time} ~COLOR_WHITE~seconds",
+        ["useitem"]        = "Use your photo from inventory within ~COLOR_YELLOW~${time}~COLOR_WHITE~ seconds",
         ["alreadyidcard"]  = "You already have an identity card. You need approval to change your ID card",
         ["idcarddesc"]     = "${name}'s identity </br>Identity Number: <span style=color:yellow;>${charid}",
         ["noprintphoto"]   = "You do not have a passport photo !",
@@ -83,17 +80,20 @@ Config.ShowDistance            = 1.5
 
 Config.Photographers = {
     ["Blackwater"] = {
+        -- promptCoords kept for blip reference; interaction is now talk-to-NPC
         promptCoords   = vector4(-810.48, -1372.56, 43.02, 104.9485),
-        promptDistance = 3.5,  -- reduced 30% from 5
+        promptDistance = 3.5,
         pedCoords      = vector4(-810.48, -1372.56, 43.02, 285.0),
         camCoords      = vector4(-814.40, -1374.85, 44.90, 86.48),
         camFov         = 60.0,
         npc = {
-            model    = "mp_re_photography_females_01",  -- photographer NPC
+            model    = "mp_re_photography_females_01",
             hash     = 0x5730F05E,
             fallback = "cs_brontesbutler",
-            coords   = vector4(-810.48, -1372.56, 43.02, 285.0),
-            anim     = "WORLD_HUMAN_SMOKE_NERVOUS_STRESSED",
+            -- heading flipped 180 degrees: 285 -> 105
+            coords   = vector4(-810.48, -1372.56, 43.02, 105.0),
+            -- Standing idle scenario (not crouching)
+            anim     = "WORLD_HUMAN_STAND_IMPATIENT",
         },
         blips = {
             name     = "ID Photo",
@@ -106,7 +106,8 @@ Config.Photographers = {
 }
 
 Config.PedSpawnDistance = 30
--- Vampire Cult removed
+Config.TalkDistance     = 2.5  -- how close to trigger talk prompt on photographer NPC
+
 Config.Religious = {
     "Christian", "Buddhist", "Wiccan", "Pagan",
     "Spiritualist", "Coven",
@@ -134,7 +135,7 @@ Config.IDCardNPC = {
             modifier = "BLIP_MODIFIER_MP_COLOR_32",
         },
         anims = {
-            dict = "WORLD_HUMAN_SMOKE_NERVOUS_STRESSED",
+            dict = "WORLD_HUMAN_STAND_IMPATIENT",
             name = false,
         },
         timeSettings = {
@@ -150,7 +151,7 @@ Config.IDCardNPC = {
         models       = "cs_brontesbutler",
         distance     = 2,
         blips        = false,
-        anims        = { dict = "WORLD_HUMAN_SMOKE_NERVOUS_STRESSED", name = false },
+        anims        = { dict = "WORLD_HUMAN_STAND_IMPATIENT", name = false },
         timeSettings = false,
     },
 }
@@ -180,8 +181,9 @@ function Locale(key, subs)
         and Config.Locale[Config.Language][key]
         or "[missing: "..key.."]"
     subs = subs or {}
+    -- Simple ${key} substitution — no leading %% required
     for k, v in pairs(subs) do
-        translate = translate:gsub('%%${' .. k .. '}', tostring(v):gsub("%%","%%%%"))
+        translate = translate:gsub('%${' .. k .. '}', tostring(v))
     end
-    return tostring(translate):gsub("%%%%","%%")
+    return translate
 end

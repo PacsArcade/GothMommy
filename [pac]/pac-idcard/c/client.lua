@@ -3,15 +3,16 @@ local cam           = 0
 local currentCamPos = nil
 local movements     = {}
 local movements2    = {}
+local movements3    = {}  -- photographer talk prompt
 local creating      = false
 local currentFilter = 1
 
--- ─── Prompt setup ──────────────────────────────────────────────────────────
+-- ─── Prompt setup ───────────────────────────────────────────────────────────
 local function createPrompts(keysTable, promptGroup)
     local array = {}
     for _, keyData in ipairs(keysTable) do
         local m = PromptRegisterBegin()
-        PromptSetControlAction(m, GetHashKey(keyData[2][1]))  -- INPUT_* name → hash → correct icon
+        PromptSetControlAction(m, GetHashKey(keyData[2][1]))
         PromptSetText(m, CreateVarString(10, 'LITERAL_STRING', keyData[1]))
         PromptSetEnabled(m, 1)
         PromptSetVisible(m, 1)
@@ -25,8 +26,9 @@ local function createPrompts(keysTable, promptGroup)
     return array
 end
 
-local promptGroup1 = GetRandomIntInRange(0, 0xffffff)
-local promptGroup2 = GetRandomIntInRange(0, 0xffffff)
+local promptGroup1 = GetRandomIntInRange(0, 0xffffff)  -- camera mode controls
+local promptGroup2 = GetRandomIntInRange(0, 0xffffff)  -- id card NPC
+local promptGroup3 = GetRandomIntInRange(0, 0xffffff)  -- photographer talk
 
 local keysTable1 = {
     { Locale("takephoto"),  Config.Keybinds["takephoto"]  },
@@ -44,11 +46,16 @@ local keysTable1 = {
 local keysTable2 = {
     { Locale("takeidcard"), Config.Keybinds["takeidcard"] },
 }
+local keysTable3 = {
+    -- Talk to photographer uses the same E key as takeidcard
+    { Locale("talkphoto"),  Config.Keybinds["takeidcard"] },
+}
 
 Citizen.CreateThread(function()
     Citizen.Wait(10)
     movements  = createPrompts(keysTable1, promptGroup1)
     movements2 = createPrompts(keysTable2, promptGroup2)
+    movements3 = createPrompts(keysTable3, promptGroup3)
 end)
 
 local function ctrl(key) return Config.Keybinds[key][2] end
@@ -172,7 +179,7 @@ local function exitCamera()
     Config.ShowHud()
 end
 
--- ─── Camera / photo session ────────────────────────────────────────────────
+-- ─── Camera / photo session ──────────────────────────────────────────────────
 local function takePhoto(v)
     DoScreenFadeOut(1000)
     Wait(1000)
@@ -218,15 +225,14 @@ local function takePhoto(v)
     end)
 end
 
--- ─── Photographer NPC spawn ─────────────────────────────────────────────────
+-- ─── Photographer NPC spawn ──────────────────────────────────────────────────
 local photographerPeds = {}
 
 local function spawnPhotographerPed(key, v)
     if photographerPeds[key] then return end
-    local npc   = v.npc
+    local npc    = v.npc
     local coords = npc.coords
-    -- Try model string first, fall back to hash, then fallback model
-    local hash = npc.hash or GetHashKey(npc.model)
+    local hash   = npc.hash or GetHashKey(npc.model)
     RequestModel(hash)
     local t = 0
     while not HasModelLoaded(hash) do
@@ -247,8 +253,8 @@ local function spawnPhotographerPed(key, v)
     SetBlockingOfNonTemporaryEvents(ped, true)
     SetModelAsNoLongerNeeded(hash)
     SetEntityAsMissionEntity(ped, true, true)
-    -- Play idle scenario
     if npc.anim then
+        -- Use standing scenario so the NPC is upright
         TaskStartScenarioInPlace(ped, GetHashKey(npc.anim), 0, true, false, false, false)
     end
     photographerPeds[key] = ped
@@ -272,7 +278,7 @@ Citizen.CreateThread(function()
     end
 end)
 
--- ─── Photographer blips (created once on resource start) ───────────────────
+-- ─── Photographer blips ──────────────────────────────────────────────────────
 local function createPhotographerBlip(v)
     local c = v.blips.coords or vector3(v.promptCoords.x, v.promptCoords.y, v.promptCoords.z)
     local blip = N_0x554d9d53f696d002(1664425300, c.x, c.y, c.z)
@@ -292,27 +298,31 @@ Citizen.CreateThread(function()
     end
 end)
 
--- ─── Photographer interaction thread ───────────────────────────────────────
+-- ─── Photographer talk-to-NPC interaction ────────────────────────────────────
+-- Instead of an area trigger, the player must walk up to the NPC and press E.
+-- First press -> camera mode (take passport photo)
+-- While in camera mode, Enter prints the photo
 Citizen.CreateThread(function()
     while true do
-        local sleep   = 2000
-        local coords  = GetEntityCoords(PlayerPedId())
+        local sleep  = 500
+        local myPos  = GetEntityCoords(PlayerPedId())
         for k, v in pairs(Config.Photographers) do
-            local dist = #(vector3(v.promptCoords.x, v.promptCoords.y, v.promptCoords.z) - coords)
-            if dist < v.promptDistance then
-                sleep = 1
-                local label = Locale("promptitle")
-                if Config.Prices.printphoto then label = label.." $"..Config.Prices.printphoto end
-                PromptSetActiveGroupThisFrame(promptGroup1, CreateVarString(10,'LITERAL_STRING',label))
-                setActivePrompts("photo")
-                if PromptHasHoldModeCompleted(movements[1]) then
-                    sleep = 2000
-                    Config.HideHud()
-                    takePhoto(v)
-                elseif PromptHasHoldModeCompleted(movements[2]) then
-                    sleep = 2000
-                    SetNuiFocus(true, true)
-                    SendNUIMessage({ action = 'print' })
+            local ped = photographerPeds[k]
+            if ped and DoesEntityExist(ped) then
+                local dist = #(myPos - GetEntityCoords(ped))
+                if dist < Config.TalkDistance then
+                    sleep = 1
+                    local label = Locale("promptitle")
+                    if Config.Prices.printphoto then
+                        label = label .. " $" .. Config.Prices.printphoto
+                    end
+                    PromptSetActiveGroupThisFrame(promptGroup3, CreateVarString(10,'LITERAL_STRING', label))
+                    if PromptHasHoldModeCompleted(movements3[1]) then
+                        Config.HideHud()
+                        takePhoto(v)
+                        -- debounce: wait until out of camera or moved away
+                        while cam do Wait(500) end
+                    end
                 end
             end
         end
@@ -414,14 +424,14 @@ Citizen.CreateThread(function()
     end
 end)
 
--- ─── /idcard command ─────────────────────────────────────────────────────────────
+-- ─── /idcard command ──────────────────────────────────────────────────────────
 if Config.TakeCardType == "sql" then
     RegisterCommand(Config.ShowIdcardCommand, function()
         TriggerEvent("fx-idcard:client:showIDCardSQL")
     end)
 end
 
--- ─── Cleanup ─────────────────────────────────────────────────────────────────
+-- ─── Cleanup ──────────────────────────────────────────────────────────────────
 AddEventHandler('onResourceStop', function(resourceName)
     if GetCurrentResourceName() ~= resourceName then return end
     for _, v in pairs(Config.Photographers) do
