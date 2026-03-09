@@ -76,40 +76,57 @@ Config.WomanIdCardItem         = "woman_idcard"
 Config.ShowDistance            = 1.5
 
 --[[
-  BLACKWATER STUDIO COORDS  (confirmed from /phototest: floor z=45.07)
+  COORDS FROM LIVE /phototest MEASUREMENTS:
 
-  RDR heading:  0=North  90=West  180=South  270=East
+  Player pose spot:  x=-814.981  y=-1375.036  z=44.278  (player stands here, faces toward cam)
+  Camera position:   x=-812.721  y=-1375.099  z=44.973  (above subject eye level)
+  NPC position:      x=-811.198  y=-1372.289  z=44.073  (confirmed floor z)
 
-  NPC  x=-812.5  heading=90   => faces WEST toward back wall
-  Pose x=-807.5  heading=270  => player faces EAST toward camera
-  Cam  x=-814.0              => behind tripod, looks east at subject
+  Camera yaw: cam is at x=-812.7, player at x=-814.9
+    dx = -814.9 - (-812.7) = -2.2  (player is to the WEST/negative-X of cam)
+    In RDR: heading = atan2(-dx, -dy) converted... but easier:
+    We want cam to look toward x=-814.9 from x=-812.7
+    That's looking in the -X direction = West = RDR yaw ~270 degrees
+    (RDR: 0=N 90=W 180=S 270=E -- NO wait RDR is clockwise from North:
+      0=N, 90=E, 180=S, 270=W)
+    So looking WEST = 270 yaw.
+    But SetCamRot yaw behaves differently from entity heading.
+    SetCamRot(cam, pitch, roll, yaw, 2) where yaw=0 looks North.
+    To look West (negative X): yaw = -90 or 270.
+
+    Actually from empirical testing in RDR3 scripted cams:
+    SetCamRot yaw: 0=North, positive=clockwise, so West = -90 (or 270)
 ]]
+
 Config.Photographers = {
     ["Blackwater"] = {
-        promptCoords   = vector4(-810.48, -1372.56, 45.07, 180.0),
+        promptCoords   = vector4(-812.00, -1373.50, 44.07, 180.0),
         promptDistance = 3.5,
 
-        -- Player pose spot: back wall, facing east (toward camera)
-        pedCoords = vector4(-807.50, -1372.56, 45.07, 270.0),
+        -- Player stands here for photo (confirmed from standing in spot + /phototest)
+        pedCoords = vector4(-814.981, -1375.036, 44.278, 90.0),
+        -- heading=90 in RDR entity heading = faces EAST (positive X)
+        -- The camera is at x=-812 which is EAST of x=-814, so player faces East = toward cam. Correct.
 
-        -- Camera sits behind tripod.
-        -- Original working rotation: pitch=0, roll=0, yaw=90 (faces west)
-        camCoords = vector4(-814.00, -1372.56, 45.70, 90.0),
-        camFov    = 50.0,
+        -- Camera sits east of player, looks west toward subject
+        -- z raised slightly above eye level for portrait framing
+        -- yaw=-90 (or 270) to look west in SetCamRot
+        camCoords = vector4(-812.721, -1375.099, 44.973, -90.0),
+        camFov    = 45.0,
 
         npc = {
             model    = "mp_re_photography_females_01",
             hash     = 0x5730F05E,
             fallback = "cs_brontesbutler",
-            -- floor z=45.07, heading=90 => faces west toward subject
-            coords   = vector4(-812.50, -1372.56, 45.07, 90.0),
+            -- Confirmed floor z=44.073, heading 270=faces west (toward player at x=-814)
+            coords   = vector4(-811.198, -1372.289, 44.073, 270.0),
         },
         blips = {
             name     = "ID Photo",
             sprite   = 1364029453,
             scale    = 0.6,
             modifier = "BLIP_MODIFIER_MP_COLOR_32",
-            coords   = vector3(-810.48, -1372.56, 45.07),
+            coords   = vector3(-812.00, -1373.50, 44.07),
         },
     },
 }
