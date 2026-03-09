@@ -60,8 +60,8 @@ Config.HideHud = function() end
 Config.ShowHud = function() end
 
 Config.Prices = {
-    printphoto = 5,
-    idcard     = 50,
+    printphoto = 0,   -- FREE to take the portrait photo
+    idcard     = 5,   -- $5 to develop / print the film
     illegal    = 100,
 }
 
@@ -76,40 +76,28 @@ Config.WomanIdCardItem         = "woman_idcard"
 Config.ShowDistance            = 1.5
 
 --[[
-  CONFIRMED COORDS from live /phototest walks
-
   NAVMESH +1 RULE: Both CreatePed AND SetEntityCoords snap up +1 in this building.
-  So ALL z values in config must be 1 unit BELOW the desired floor z.
+  All z values in config must be 1 unit BELOW the desired floor z.
 
-  Desired floor z = 44.073 (confirmed by NPC landing)
-  Config z for NPC   = 43.073  (CreatePed snaps to 44.073) ✅
-  Config z for pedCoords = 43.278  (SetEntityCoords snaps to 44.278) ✅
+  Desired floor z = 44.073 (NPC confirmed), 44.278 (player pose confirmed)
+  Config z for NPC        = 43.073  (CreatePed snaps to 44.073)
+  Config z for pedCoords  = 43.278  (SetEntityCoords snaps to 44.278)
+  BUT player is still landing at 44.328 not 44.278, so we nudge to 43.228.
 
   RDR heading: 0=North  90=West  180=South  270=East
-  NPC default heading  = 270 (faces East, toward door / cash register)
-  NPC photoHeading     = 90  (faces West, toward player at x=-814)
-  Player heading       = 270 (faces East, toward camera at x=-812)
 ]]
 Config.Photographers = {
     ["Blackwater"] = {
         promptCoords   = vector4(-812.00, -1373.50, 44.07, 180.0),
         promptDistance = 3.5,
-
-        -- Player pose spot.
-        -- z=43.278: SetEntityCoords snaps +1 in this building, lands at 44.278
-        pedCoords = vector4(-814.981, -1375.036, 43.278, 270.0),
-
-        -- Camera position (confirmed from /phototest)
+        pedCoords = vector4(-814.981, -1375.036, 43.228, 270.0),
         camCoords = vector4(-812.721, -1375.099, 44.973, 0.0),
         camFov    = 45.0,
-
         npc = {
             model    = "mp_re_photography_females_01",
             hash     = 0x5730F05E,
             fallback = "cs_brontesbutler",
-            -- z=43.073: CreatePed snaps +1, lands at 44.073
             coords      = vector4(-811.771, -1373.614, 43.073, 270.0),
-            -- heading during photo session: 90 = faces West = toward player
             photoHeading = 90.0,
         },
         blips = {

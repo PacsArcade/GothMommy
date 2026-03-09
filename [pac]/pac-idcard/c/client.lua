@@ -1,16 +1,22 @@
 -- ═══════════════════════════════════════════════════════════
-print("[pac-idcard] VERSION: 2026-03-09-v8 numpad+filter-layer")
+print("[pac-idcard] VERSION: 2026-03-09-v9 countdown+shoot+fixexit")
 -- ═══════════════════════════════════════════════════════════
 
 local idcardData    = false
 local cam           = nil
 local currentCamPos = nil
-local defaultCamPos = nil  -- stored so NUM5 can reset
+local defaultCamPos = nil
 local movements     = {}
 local movements2    = {}
 local movements3    = {}
 local creating      = false
 local currentFilter = 1
+
+-- forward declarations so all functions can call each other
+local exitCamera
+local setPhotographerHeading
+local cycleFilter
+local applyFilter
 
 -- ─── Prompt helpers ───────────────────────────────────────────────────────────
 local function createPrompt(inputName, label, promptGroup, holdMs)
@@ -51,9 +57,10 @@ Citizen.CreateThread(function()
         movements[#movements+1] = createPrompt(kd[1], kd[2], promptGroup1)
     end
     movements2[1] = createPrompt(Config.Keybinds["takeidcard"][1], Locale("takeidcard"), promptGroup2)
-    local price = (Config.Prices and Config.Prices.printphoto) or 5
-    movements3[1] = createPrompt(Config.Keybinds["takeidcard"][1],  "Take Photo ($"..price..")", promptGroup3)
-    movements3[2] = createPrompt(Config.Keybinds["printphoto"][1], "Develop Film",              promptGroup3)
+    local price = (Config.Prices and Config.Prices.printphoto) or 0
+    local photoLabel = price > 0 and "Take Photo ($"..price..")" or "Take Photo (Free)"
+    movements3[1] = createPrompt(Config.Keybinds["takeidcard"][1],  photoLabel,    promptGroup3)
+    movements3[2] = createPrompt(Config.Keybinds["printphoto"][1], "Develop Film", promptGroup3)
 end)
 
 -- ─── NUI Callbacks ────────────────────────────────────────────────────────────
@@ -74,23 +81,26 @@ RegisterNUICallback('createIdCard', function(data)
     TriggerServerEvent('fx-idcard:server:buyIdCard', data)
 end)
 
--- ─── Camera movement via NUI keyboard ─────────────────────────────────────────
+-- Shoot: NUI finished countdown, now trigger game screenshot
+RegisterNUICallback('camShoot', function(data)
+    -- ExportScreenshot saves to the standard screenshots folder
+    -- (same as the game's built-in screenshot)
+    Citizen.InvokeNative(0x3B96D87CB7DA1245, true)
+    Notify({ text = "~COLOR_YELLOW~Photo saved!", time = 3000, type = "success" })
+end)
+
+-- ─── Camera movement via NUI keyboard ────────────────────────────────────────
 RegisterNUICallback('camMove', function(data)
     local dir = data.dir
     if dir == "exit" then
-        if _currentPhotoKey and _currentDefaultHeading then
-            exitCamera(_currentPhotoKey, _currentDefaultHeading)
-        else
-            exitCamera(nil, nil)
-        end
+        exitCamera(_currentPhotoKey, _currentDefaultHeading)
         return
     end
     if dir == "filter_next" then cycleFilter( 1); return end
     if dir == "filter_prev" then cycleFilter(-1); return end
     if dir == "reset" then
-        -- Snap back to original camera position
         if defaultCamPos and cam then
-            currentCamPos = { x = defaultCamPos.x, y = defaultCamPos.y, z = defaultCamPos.z }
+            currentCamPos = { x=defaultCamPos.x, y=defaultCamPos.y, z=defaultCamPos.z }
             SetCamCoord(cam, currentCamPos.x, currentCamPos.y, currentCamPos.z)
             if data.pcx then PointCamAtCoord(cam, data.pcx, data.pcy, data.pcz) end
         end
@@ -98,9 +108,6 @@ RegisterNUICallback('camMove', function(data)
     end
     if not cam or not currentCamPos then return end
     local step = 0.15
-    -- Up/down: move camera position up/down (Z axis)
-    -- Left/right: slide camera left/right (Y axis - perpendicular to subject)
-    -- Fwd/back: dolly camera toward/away from subject (X axis)
     if     dir == "up"    then currentCamPos.z = currentCamPos.z + step
     elseif dir == "down"  then currentCamPos.z = currentCamPos.z - step
     elseif dir == "left"  then currentCamPos.y = currentCamPos.y + step
@@ -109,7 +116,6 @@ RegisterNUICallback('camMove', function(data)
     elseif dir == "back"  then currentCamPos.x = currentCamPos.x - step
     end
     SetCamCoord(cam, currentCamPos.x, currentCamPos.y, currentCamPos.z)
-    -- Always re-aim at player after any move so subject stays in frame
     if data.pcx then
         PointCamAtCoord(cam, data.pcx, data.pcy, data.pcz)
     end
@@ -168,14 +174,14 @@ function GetClosestPlayer()
     return result
 end
 
-local function applyFilter(idx)
+applyFilter = function(idx)
     local f = Config.CameraFilters
     if not f or #f == 0 then return end
     local filter = f[idx] or f[1]
     SendNUIMessage({ action = 'setFilter', css = filter.css, name = filter.name })
 end
 
-function cycleFilter(dir)
+cycleFilter = function(dir)
     currentFilter = currentFilter + dir
     local n = #Config.CameraFilters
     if currentFilter < 1 then currentFilter = n end
@@ -186,21 +192,21 @@ end
 _currentPhotoKey       = nil
 _currentDefaultHeading = nil
 
-local function setPhotographerHeading(key, heading)
+setPhotographerHeading = function(key, heading)
     local p = photographerPeds and photographerPeds[key]
     if p and DoesEntityExist(p) then
         SetEntityHeading(p, heading)
     end
 end
 
-local function exitCamera(photographerKey, restoreHeading)
+exitCamera = function(photographerKey, restoreHeading)
     SendNUIMessage({ action = 'showCameraOverlay', visible = false })
     SetNuiFocus(false, false)
     RenderScriptCams(false, false, 0, true, true)
     if cam then DestroyCam(cam, true) end
-    cam = nil
-    currentCamPos  = nil
-    defaultCamPos  = nil
+    cam           = nil
+    currentCamPos = nil
+    defaultCamPos = nil
     _currentPhotoKey       = nil
     _currentDefaultHeading = nil
     SetPlayerControl(PlayerId(), true)
@@ -239,8 +245,8 @@ local function takePhoto(v, key)
         actualPos.x, actualPos.y, actualPos.z, pc.z))
 
     cam = CreateCam("DEFAULT_SCRIPTED_CAMERA", true)
-    currentCamPos = { x = cc.x, y = cc.y, z = cc.z }
-    defaultCamPos = { x = cc.x, y = cc.y, z = cc.z }  -- save for NUM5 reset
+    currentCamPos = { x=cc.x, y=cc.y, z=cc.z }
+    defaultCamPos = { x=cc.x, y=cc.y, z=cc.z }
     SetCamCoord(cam, cc.x, cc.y, cc.z)
     local targetZ = actualPos.z + 0.7
     PointCamAtCoord(cam, pc.x, pc.y, targetZ)
@@ -373,7 +379,6 @@ Citizen.CreateThread(function()
                 end
             end
         end
-
         Wait(sleep)
     end
 end)
