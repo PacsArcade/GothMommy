@@ -6,14 +6,10 @@ $(document).ready(function () {
     $(".previewcreate-photo").hide();
     var setIllegal = false;
 
-    // ── Camera filter overlay ──────────────────────────────────────────────
+    // ── Camera filter overlay ─────────────────────────────────────────────
     function setFilter(css, name) {
         var overlay = $("#camera-overlay");
-        if (css === 'none' || !css) {
-            overlay.css('filter', 'none');
-        } else {
-            overlay.css('filter', css);
-        }
+        overlay.css('filter', (css === 'none' || !css) ? 'none' : css);
         $("#filter-label").text(name || '');
     }
 
@@ -24,9 +20,14 @@ $(document).ready(function () {
             return;
         }
         var sex = array.sex === "Female" ? "F" : "M";
-        $(".charid").html(array.charid || "N/A");
-        // Use licenseNumber if present, otherwise fall back to prev_license or charid
-        $(".license").html(array.licenseNumber || array.prev_license || ("GMRP-" + (array.charid || "N/A")));
+
+        // ID No field: show the formatted license number, not the raw integer
+        var displayId = array.licenseNumber || array.prev_license || ("GMRP-" + String(array.charid || 'N/A').padStart(6, '0'));
+        $(".charid").html(displayId);
+
+        // Previous License field (bottom right of card)
+        $(".license").html(array.prev_license || displayId);
+
         $(".sex").html(sex);
         $(".hair").html(array.hair || "N/A");
         $(".eyes").html(array.eye || "N/A");
@@ -36,7 +37,8 @@ $(document).ready(function () {
         $(".dateofbirth").html(array.date || "N/A");
         $(".age").html(array.age || "N/A");
         $(".name").html(array.name || "N/A");
-        $(".country").html(array.country || "N/A");
+        // country slot: use server name instead of blank/N/A
+        $(".country").html(array.country || "Goth Mommy RP");
         $(".card-zone").html(array.cityname || "N/A");
         $(".playerimg").attr("src", array.img || "/path/to/default/image.png");
         $(".id-card")
@@ -83,19 +85,15 @@ $(document).ready(function () {
 
         // City of birth dropdown
         var city = data.city || "Blackwater";
-        if ($("#cityname option[value='" + city + "']").length) {
-            $("#cityname").val(city);
-        } else {
-            $("#cityname").val("Other");
-        }
+        $("#cityname").val(
+            $("#cityname option[value='" + city + "']").length ? city : "Other"
+        );
 
         // Religion dropdown
         var rel = data.religious || "";
-        if ($("#religious option[value='" + rel + "']").length) {
-            $("#religious").val(rel);
-        } else {
-            $("#religious").val("");
-        }
+        $("#religious").val(
+            $("#religious option[value='" + rel + "']").length ? rel : ""
+        );
 
         $("#ageinput").val(data.age);
         $("#weightinput").val(data.weight ? data.weight + "KG" : "80KG");
@@ -107,16 +105,15 @@ $(document).ready(function () {
             $("#sex-women").prop("checked", true);
             $("#sex-man").prop("checked", false);
         }
-
         $("#sex-man, #sex-women").change(function () {
             $("#sex-man, #sex-women").not($(this)).prop("checked", false);
         });
 
         if (!illegal) {
             var maxYear = 1899 - data.age;
-            $("#dateinput").attr("max", maxYear + "-12-31");
-            $("#dateinput").attr("min", maxYear + "-01-01");
-            $("#dateinput").val(maxYear + "-01-01");
+            $("#dateinput").attr("max", maxYear + "-12-31")
+                           .attr("min", maxYear + "-01-01")
+                           .val(maxYear + "-01-01");
         }
 
         $("#previewphoto").attr("src", data.img).attr("data-itemid", data.itemId);
@@ -126,19 +123,11 @@ $(document).ready(function () {
 
         // Hair dropdown
         var hair = data.hair || "Black";
-        if ($("#hair option[value='" + hair + "']").length) {
-            $("#hair").val(hair);
-        } else {
-            $("#hair").val("Black");
-        }
+        $("#hair").val($("#hair option[value='" + hair + "']").length ? hair : "Black");
 
         // Eye dropdown
         var eye = data.eye || "Brown";
-        if ($("#eye option[value='" + eye + "']").length) {
-            $("#eye").val(eye);
-        } else {
-            $("#eye").val("Brown");
-        }
+        $("#eye").val($("#eye option[value='" + eye + "']").length ? eye : "Brown");
     }
 
     function showPrintPhoto(img) {

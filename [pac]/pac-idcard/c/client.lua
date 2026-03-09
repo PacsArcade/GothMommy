@@ -3,11 +3,11 @@ local cam           = 0
 local currentCamPos = nil
 local movements     = {}
 local movements2    = {}
-local movements3    = {}  -- photographer talk prompt
+local movements3    = {}  -- photographer talk + print prompts
 local creating      = false
 local currentFilter = 1
 
--- ─── Prompt setup ───────────────────────────────────────────────────────────
+-- ─── Prompt setup ───────────────────────────────────────────────────────
 local function createPrompts(keysTable, promptGroup)
     local array = {}
     for _, keyData in ipairs(keysTable) do
@@ -28,7 +28,7 @@ end
 
 local promptGroup1 = GetRandomIntInRange(0, 0xffffff)  -- camera mode controls
 local promptGroup2 = GetRandomIntInRange(0, 0xffffff)  -- id card NPC
-local promptGroup3 = GetRandomIntInRange(0, 0xffffff)  -- photographer talk
+local promptGroup3 = GetRandomIntInRange(0, 0xffffff)  -- photographer NPC (talk + print)
 
 local keysTable1 = {
     { Locale("takephoto"),  Config.Keybinds["takephoto"]  },
@@ -46,9 +46,12 @@ local keysTable1 = {
 local keysTable2 = {
     { Locale("takeidcard"), Config.Keybinds["takeidcard"] },
 }
+-- Photographer NPC: two prompts in same group
+--   [1] Talk / enter camera mode  (E hold)
+--   [2] Print Photo / open link box  (Enter hold) — only shown when NOT in camera
 local keysTable3 = {
-    -- Talk to photographer uses the same E key as takeidcard
-    { Locale("talkphoto"),  Config.Keybinds["takeidcard"] },
+    { Locale("talkphoto"),  Config.Keybinds["takeidcard"] },  -- E
+    { Locale("printphoto"), Config.Keybinds["printphoto"] },  -- Enter
 }
 
 Citizen.CreateThread(function()
@@ -60,7 +63,7 @@ end)
 
 local function ctrl(key) return Config.Keybinds[key][2] end
 
--- ─── NUI Callbacks ──────────────────────────────────────────────────────────
+-- ─── NUI Callbacks ─────────────────────────────────────────────────────────
 RegisterNUICallback('close', function()
     SetNuiFocus(false, false)
     AnimpostfxStop("OJDominoBlur")
@@ -179,7 +182,7 @@ local function exitCamera()
     Config.ShowHud()
 end
 
--- ─── Camera / photo session ──────────────────────────────────────────────────
+-- ─── Camera / photo session ─────────────────────────────────────────────────
 local function takePhoto(v)
     DoScreenFadeOut(1000)
     Wait(1000)
@@ -225,7 +228,7 @@ local function takePhoto(v)
     end)
 end
 
--- ─── Photographer NPC spawn ──────────────────────────────────────────────────
+-- ─── Photographer NPC spawn ─────────────────────────────────────────────────
 local photographerPeds = {}
 
 local function spawnPhotographerPed(key, v)
@@ -238,10 +241,7 @@ local function spawnPhotographerPed(key, v)
     while not HasModelLoaded(hash) do
         Citizen.Wait(10); t = t + 10
         if t > 5000 then
-            if npc.fallback then
-                hash = GetHashKey(npc.fallback)
-                RequestModel(hash)
-            end
+            if npc.fallback then hash = GetHashKey(npc.fallback); RequestModel(hash) end
             break
         end
     end
@@ -254,7 +254,6 @@ local function spawnPhotographerPed(key, v)
     SetModelAsNoLongerNeeded(hash)
     SetEntityAsMissionEntity(ped, true, true)
     if npc.anim then
-        -- Use standing scenario so the NPC is upright
         TaskStartScenarioInPlace(ped, GetHashKey(npc.anim), 0, true, false, false, false)
     end
     photographerPeds[key] = ped
@@ -278,7 +277,7 @@ Citizen.CreateThread(function()
     end
 end)
 
--- ─── Photographer blips ──────────────────────────────────────────────────────
+-- ─── Photographer blips ────────────────────────────────────────────────────
 local function createPhotographerBlip(v)
     local c = v.blips.coords or vector3(v.promptCoords.x, v.promptCoords.y, v.promptCoords.z)
     local blip = N_0x554d9d53f696d002(1664425300, c.x, c.y, c.z)
@@ -298,30 +297,41 @@ Citizen.CreateThread(function()
     end
 end)
 
--- ─── Photographer talk-to-NPC interaction ────────────────────────────────────
--- Instead of an area trigger, the player must walk up to the NPC and press E.
--- First press -> camera mode (take passport photo)
--- While in camera mode, Enter prints the photo
+-- ─── Photographer NPC interaction (talk + print) ───────────────────────────
+--
+-- Two-step flow (matches original behaviour):
+--   Step 1: Walk up to NPC -> hold E -> enter camera mode
+--   Step 2: Take your screenshot, upload to portal, paste URL
+--           -> hold Enter near NPC -> print photo (costs $5, adds to inventory)
+--
+-- promptGroup3 shows BOTH prompts together near the NPC.
+-- When in camera mode, promptGroup1 takes over instead.
 Citizen.CreateThread(function()
     while true do
-        local sleep  = 500
-        local myPos  = GetEntityCoords(PlayerPedId())
+        local sleep = 500
+        local myPos = GetEntityCoords(PlayerPedId())
         for k, v in pairs(Config.Photographers) do
             local ped = photographerPeds[k]
             if ped and DoesEntityExist(ped) then
                 local dist = #(myPos - GetEntityCoords(ped))
-                if dist < Config.TalkDistance then
+                if dist < Config.TalkDistance and not cam then
                     sleep = 1
                     local label = Locale("promptitle")
                     if Config.Prices.printphoto then
                         label = label .. " $" .. Config.Prices.printphoto
                     end
                     PromptSetActiveGroupThisFrame(promptGroup3, CreateVarString(10,'LITERAL_STRING', label))
+
+                    -- [E] hold -> enter camera / photo mode
                     if PromptHasHoldModeCompleted(movements3[1]) then
                         Config.HideHud()
                         takePhoto(v)
-                        -- debounce: wait until out of camera or moved away
-                        while cam do Wait(500) end
+                        while cam do Wait(500) end  -- debounce until camera exits
+
+                    -- [Enter] hold -> open print photo UI (paste link -> adds to inventory)
+                    elseif PromptHasHoldModeCompleted(movements3[2]) then
+                        SetNuiFocus(true, true)
+                        SendNUIMessage({ action = 'print' })
                     end
                 end
             end
@@ -424,14 +434,14 @@ Citizen.CreateThread(function()
     end
 end)
 
--- ─── /idcard command ──────────────────────────────────────────────────────────
+-- ─── /idcard command ─────────────────────────────────────────────────────────
 if Config.TakeCardType == "sql" then
     RegisterCommand(Config.ShowIdcardCommand, function()
         TriggerEvent("fx-idcard:client:showIDCardSQL")
     end)
 end
 
--- ─── Cleanup ──────────────────────────────────────────────────────────────────
+-- ─── Cleanup ────────────────────────────────────────────────────────────────
 AddEventHandler('onResourceStop', function(resourceName)
     if GetCurrentResourceName() ~= resourceName then return end
     for _, v in pairs(Config.Photographers) do
