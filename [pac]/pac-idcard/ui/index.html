@@ -14,6 +14,7 @@
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
 
+        /* ID card form theming */
         .create { background: rgba(10,6,2,0.92) !important; color: #e8d8b0 !important; }
         .create .label, .create span { color: #c8a96e !important; }
         .create input, .create select { background: rgba(30,18,5,0.85) !important; color: #f0e0b0 !important; border-color: #6b4c20 !important; }
@@ -25,119 +26,142 @@
 
         /*
          * =====================================================
-         * FILTER LAYER STACK  (all behind #camera-overlay)
+         * FILTER LAYER ARCHITECTURE
          *
-         *  9950  #filter-tint     — rgba colour multiply tint
-         *  9955  #filter-pixel    — pixelate (scaled canvas)
-         *  9960  #filter-blur-div — CSS filter:blur on a div
-         *  9965  #filter-acid     — SVG turbulence + hue flood
-         *  9970  #filter-devil    — purple tint + red eye glow
+         * KEY INSIGHT: NUI in RedM/CEF renders on top of the
+         * game's framebuffer. The NUI background is transparent
+         * by default. CSS blend modes / backdrop-filter do NOT
+         * composite against the game render — they only affect
+         * other HTML elements.
          *
-         *  9999  #camera-overlay  — HUD (isolation:isolate)
+         * SOLUTION: Use SOLID colour divs at ~35-45% opacity.
+         * These visually tint the scene because they're opaque
+         * panels sitting over the transparent NUI surface.
+         * The game shows through the gaps but the solid colour
+         * overlaid at partial opacity creates the tint effect.
+         *
+         * Pixelate: we use a CSS transform scale trick on a
+         * small canvas (draw tiny, scale up pixelated).
+         *
+         * Blur: solid frosted white/grey panel — creates a
+         * "foggy lens" look.
+         *
+         * Acid/Devil: animated CSS divs.
+         *
+         * Z-stack:
+         *   9950  #fl-solid   — colour tint
+         *   9955  #fl-pixel   — pixelate canvas
+         *   9960  #fl-blur    — foggy haze
+         *   9965  #fl-acid    — acid warp animation
+         *   9970  #fl-devil   — devil eye glow
+         *   9999  #camera-overlay  — HUD (isolation:isolate)
          * =====================================================
          */
 
-        .filter-layer {
+        .fl {
             display: none;
             position: fixed;
             inset: 0;
             pointer-events: none;
-            will-change: opacity;
         }
 
-        /* --- TINT (multiply colour over scene) --- */
-        #filter-tint {
-            z-index: 9950;
-            /* background set by JS */
-            mix-blend-mode: multiply;
-        }
+        /* SOLID tint */
+        #fl-solid { z-index: 9950; }
 
-        /* --- PIXEL (small canvas upscaled with image-rendering:pixelated) --- */
-        #filter-pixel { z-index: 9955; }
+        /* PIXEL: tiny canvas scaled up */
+        #fl-pixel { z-index: 9955; overflow: hidden; }
         #pixel-canvas {
             position: absolute;
             top: 0; left: 0;
-            width: 100vw; height: 100vh;
+            /* actual dimensions set by JS; CSS stretches it */
+            width: 100vw;
+            height: 100vh;
             image-rendering: pixelated;
             image-rendering: crisp-edges;
         }
 
-        /* --- BLUR (CSS filter on a div containing a white layer) ---
-             backdrop-filter is unreliable in CEF.
-             Instead we use a white semi-transparent div with
-             CSS filter:blur — it softens the content behind it
-             by adding a blurred haze over the scene.            --- */
-        #filter-blur-div {
-            z-index: 9960;
-            background: rgba(255,255,255,0.08);
-            /* filter applied to THIS div's own pixels, not scene */
-            filter: blur(0px);
-            animation: none;
-        }
-        #filter-blur-div.active {
-            animation: blurPulse 2s ease-in-out infinite alternate;
+        /* BLUR: layered solid panels that create a frosted-glass look */
+        #fl-blur { z-index: 9960; }
+        #blur-inner {
+            position: absolute; inset: 0;
+            background: rgba(210, 225, 245, 0.18);
+            animation: blurPulse 2.5s ease-in-out infinite alternate;
         }
         @keyframes blurPulse {
-            0%   { filter: blur(4px)  brightness(0.92) saturate(0.7); background: rgba(200,220,255,0.10); }
-            50%  { filter: blur(8px)  brightness(0.88) saturate(0.5); background: rgba(200,220,255,0.14); }
-            100% { filter: blur(12px) brightness(0.85) saturate(0.4); background: rgba(200,220,255,0.10); }
+            0%   { background: rgba(200,215,240,0.16); opacity: 0.80; }
+            100% { background: rgba(220,235,255,0.26); opacity: 1.00; }
         }
 
-        /* --- ACID TRIP --- */
-        #filter-acid { z-index: 9965; }
-        /* Inner colour flood that gets warped by SVG filter */
-        #acid-flood {
-            position: absolute;
-            inset: 0;
-            animation: acidColors 1.8s linear infinite;
-            filter: url(#acid-filter);
+        /* ACID */
+        #fl-acid { z-index: 9965; }
+        #acid-layer1 {
+            position: absolute; inset: 0;
+            animation: acidCycle 1.6s linear infinite;
         }
-        @keyframes acidColors {
-            0%   { background: rgba(80, 0, 160, 0.28); filter: url(#acid-filter) hue-rotate(0deg); }
-            25%  { background: rgba(0, 160, 60,  0.28); filter: url(#acid-filter) hue-rotate(90deg); }
-            50%  { background: rgba(0, 80, 200,  0.28); filter: url(#acid-filter) hue-rotate(180deg); }
-            75%  { background: rgba(200, 60, 0,  0.28); filter: url(#acid-filter) hue-rotate(270deg); }
-            100% { background: rgba(80, 0, 160,  0.28); filter: url(#acid-filter) hue-rotate(360deg); }
+        @keyframes acidCycle {
+            0%   { background: rgba(100,  0,180,0.32); }
+            16%  { background: rgba(  0,160, 60,0.32); }
+            33%  { background: rgba(  0, 80,220,0.32); }
+            50%  { background: rgba(220, 60,  0,0.32); }
+            66%  { background: rgba(200,200,  0,0.32); }
+            83%  { background: rgba( 80,  0,200,0.32); }
+            100% { background: rgba(100,  0,180,0.32); }
         }
-        /* Second wave for extra warp depth */
-        #acid-wave {
-            position: absolute;
-            inset: 0;
-            background: transparent;
-            filter: url(#acid-filter2);
-            animation: acidWave 2.4s ease-in-out infinite alternate;
-            opacity: 0.35;
+        #acid-layer2 {
+            position: absolute; inset: 0;
+            animation: acidWarp 2.2s ease-in-out infinite alternate;
+            filter: url(#acid-svg);
         }
-        @keyframes acidWave {
-            0%   { opacity: 0.20; filter: url(#acid-filter2) hue-rotate(30deg);  }
-            100% { opacity: 0.45; filter: url(#acid-filter2) hue-rotate(200deg); }
+        @keyframes acidWarp {
+            0%   { opacity: 0.0; background: rgba(255,200,0,0.20); }
+            50%  { opacity: 0.5; background: rgba(0,255,180,0.20); }
+            100% { opacity: 0.3; background: rgba(255,0,100,0.20); }
+        }
+        #acid-warp-overlay {
+            position: absolute; inset: 0;
+            background: rgba(60,0,120,0.15);
+            filter: url(#acid-svg);
+            animation: acidWarpMove 1.4s ease-in-out infinite alternate;
+        }
+        @keyframes acidWarpMove {
+            0%   { transform: scale(1.00) skewX(0deg);  opacity:0.4; }
+            50%  { transform: scale(1.02) skewX(1.5deg); opacity:0.7; }
+            100% { transform: scale(0.98) skewX(-1deg); opacity:0.5; }
         }
 
-        /* --- DEVIL EYES --- */
-        #filter-devil { z-index: 9970; }
-        /* Deep purple tint */
-        #devil-tint {
-            position: absolute;
-            inset: 0;
-            background: rgba(60, 0, 100, 0.38);
+        /* DEVIL EYES */
+        #fl-devil { z-index: 9970; }
+        #devil-bg {
+            position: absolute; inset: 0;
+            /* Dark vignette from all edges */
+            background: radial-gradient(ellipse 70% 70% at 50% 50%,
+                transparent 30%,
+                rgba(40,0,60,0.55) 100%);
         }
-        /* Red eye glow: two radial gradients positioned at eye level,
-           pulsing in opacity to look like glowing demonic eyes        */
-        #devil-eyes {
+        /* Two glowing red eye spots at approximately where a standing
+           player's eyes appear in the camera view frame               */
+        #devil-eye-l, #devil-eye-r {
             position: absolute;
-            inset: 0;
-            background:
-                radial-gradient(ellipse 7vw 4vh at 44% 36%, rgba(255,0,0,0.85) 0%, rgba(200,0,0,0.4) 35%, transparent 70%),
-                radial-gradient(ellipse 7vw 4vh at 56% 36%, rgba(255,0,0,0.85) 0%, rgba(200,0,0,0.4) 35%, transparent 70%);
-            animation: devilPulse 1.1s ease-in-out infinite alternate;
+            width: 90px;
+            height: 50px;
+            border-radius: 50%;
+            top: 32%;
+            background: radial-gradient(ellipse at center,
+                rgba(255,20,0,1.0)   0%,
+                rgba(220,0,0,0.8)   30%,
+                rgba(180,0,0,0.4)   60%,
+                transparent         100%);
+            animation: eyeGlow 0.9s ease-in-out infinite alternate;
             mix-blend-mode: screen;
         }
-        @keyframes devilPulse {
-            0%   { opacity: 0.70; }
-            100% { opacity: 1.00; }
+        #devil-eye-l { left:  calc(50% - 130px); }
+        #devil-eye-r { left:  calc(50% +  40px); }
+        @keyframes eyeGlow {
+            0%   { opacity: 0.55; transform: scale(0.90); }
+            100% { opacity: 1.00; transform: scale(1.10); box-shadow: 0 0 40px 20px rgba(255,0,0,0.6); }
         }
 
-        /* ---- HUD overlay (isolation:isolate keeps all filters contained) ---- */
+        /* HUD wrapper — isolation:isolate prevents any filter leaking in */
         #camera-overlay {
             display: none;
             position: fixed; inset: 0;
@@ -146,7 +170,7 @@
             isolation: isolate;
         }
 
-        /* Filter bar */
+        /* Filter name bar */
         #filter-bar {
             position: absolute;
             bottom: 44px; left: 50%;
@@ -165,31 +189,32 @@
         #filter-label {
             font-family: 'Georgia', serif; font-size: 20px; color: #f0e0b0;
             letter-spacing: 3px; text-shadow: 1px 1px 8px #000;
-            min-width: 140px; text-align: center;
+            min-width: 130px; text-align: center;
         }
 
-        /* Controls panel */
+        /* Controls panel — wider to fit PHOTOGRAPHER title */
         #cam-controls {
-            position: absolute; top: 50%; right: 28px;
+            position: absolute; top: 50%; right: 24px;
             transform: translateY(-50%);
             pointer-events: none; isolation: isolate;
             background: rgba(10,6,2,0.82);
             border: 1px solid #8b6914; border-radius: 6px;
-            padding: 14px 16px 12px;
-            width: 230px;
+            padding: 14px 18px 12px;
+            width: 250px;   /* wider box so title fits */
         }
         .cam-ctrl-title {
             font-family: 'Georgia', serif;
-            font-size: 13px;          /* smaller so it fits */
+            font-size: 14px;
             font-weight: bold;
             color: #d4a843;
             text-align: center;
-            letter-spacing: 4px;
+            letter-spacing: 3px;
             text-transform: uppercase;
             text-shadow: 0 0 12px rgba(212,168,67,0.7);
             margin-bottom: 10px;
             padding-bottom: 8px;
             border-bottom: 1px solid rgba(139,105,20,0.5);
+            /* clip safely — never overflow the box */
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
@@ -226,7 +251,7 @@
             padding: 10px 40px; isolation: isolate;
         }
 
-        /* Saved toast */
+        /* Toast */
         #cam-saved-toast {
             display: none; position: fixed; bottom: 80px; right: 24px;
             background: rgba(10,6,2,0.88); border: 1px solid #8b6914;
@@ -244,44 +269,46 @@
 </head>
 <body>
 
-<!-- SVG filter definitions -->
+<!-- SVG filter used by acid warp layers -->
 <svg style="position:absolute;width:0;height:0;overflow:hidden" xmlns="http://www.w3.org/2000/svg">
   <defs>
-    <!-- Acid filter 1: strong drip warp -->
-    <filter id="acid-filter" x="-10%" y="-10%" width="120%" height="120%">
-      <feTurbulence type="fractalNoise" baseFrequency="0.015 0.05" numOctaves="3" seed="3" result="noise">
-        <animate attributeName="baseFrequency" values="0.015 0.05;0.025 0.09;0.015 0.05" dur="1.4s" repeatCount="indefinite"/>
-        <animate attributeName="seed" values="3;6;9;12;3" dur="2.8s" repeatCount="indefinite"/>
+    <filter id="acid-svg" x="-20%" y="-20%" width="140%" height="140%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.018 0.06" numOctaves="3" seed="5" result="n">
+        <animate attributeName="baseFrequency" values="0.018 0.06;0.030 0.10;0.018 0.06" dur="1.5s" repeatCount="indefinite"/>
+        <animate attributeName="seed" values="5;8;12;5" dur="3s" repeatCount="indefinite"/>
       </feTurbulence>
-      <feDisplacementMap in="SourceGraphic" in2="noise" scale="40" xChannelSelector="R" yChannelSelector="G"/>
-    </filter>
-    <!-- Acid filter 2: slower secondary wave -->
-    <filter id="acid-filter2" x="-10%" y="-10%" width="120%" height="120%">
-      <feTurbulence type="turbulence" baseFrequency="0.008 0.03" numOctaves="2" seed="7" result="noise2">
-        <animate attributeName="baseFrequency" values="0.008 0.03;0.014 0.055;0.008 0.03" dur="2.2s" repeatCount="indefinite"/>
-      </feTurbulence>
-      <feDisplacementMap in="SourceGraphic" in2="noise2" scale="55" xChannelSelector="G" yChannelSelector="R"/>
+      <feDisplacementMap in="SourceGraphic" in2="n" scale="48" xChannelSelector="R" yChannelSelector="G"/>
     </filter>
   </defs>
 </svg>
 
-<!-- Filter layers -->
-<div id="filter-tint"     class="filter-layer"></div>
-<div id="filter-pixel"    class="filter-layer"><canvas id="pixel-canvas"></canvas></div>
-<div id="filter-blur-div" class="filter-layer"></div>
-<div id="filter-acid"     class="filter-layer">
-    <div id="acid-flood"></div>
-    <div id="acid-wave"></div>
+<!-- Filter layers (behind HUD) -->
+<div id="fl-solid" class="fl"></div>
+
+<div id="fl-pixel" class="fl">
+    <canvas id="pixel-canvas"></canvas>
 </div>
-<div id="filter-devil"    class="filter-layer">
-    <div id="devil-tint"></div>
-    <div id="devil-eyes"></div>
+
+<div id="fl-blur" class="fl">
+    <div id="blur-inner"></div>
+</div>
+
+<div id="fl-acid" class="fl">
+    <div id="acid-layer1"></div>
+    <div id="acid-layer2"></div>
+    <div id="acid-warp-overlay"></div>
+</div>
+
+<div id="fl-devil" class="fl">
+    <div id="devil-bg"></div>
+    <div id="devil-eye-l"></div>
+    <div id="devil-eye-r"></div>
 </div>
 
 <div id="cam-flash"></div>
 <div id="cam-saved-toast">&#128247; Photo Saved</div>
 
-<!-- HUD (isolation:isolate) -->
+<!-- Camera HUD (isolation:isolate — filters CANNOT leak in) -->
 <div id="camera-overlay">
     <div id="cam-countdown"></div>
 
@@ -312,7 +339,7 @@
     </div>
 </div>
 
-<!-- Forms -->
+<!-- Game forms -->
 <div class="previewcreate-photo"><img id="previewphoto" src="/ui/assets/printphoto.png" alt=""><img id="preview-frame" src="/ui/assets/preview-frame.png" alt=""></div>
 <div class="create">
     <button class="close-create"></button><h1>ID CARD</h1><h2>To create an ID card, fill in the following information</h2>
@@ -340,8 +367,7 @@
     <button id="submit" type="button">SUBMIT</button>
 </div>
 <div class="printphoto">
-    <img class="photo" src="https://i.hizliresim.com/950uitk.png" alt="">
-    <div class="photo-frame"></div>
+    <img class="photo" src="https://i.hizliresim.com/950uitk.png" alt=""><div class="photo-frame"></div>
     <input type="text" name="link" id="link" placeholder="https://pacsarcade.org/idphotos/">
     <button class="preview">PREVIEW</button><button class="print">PRINT</button><button class="close"></button>
 </div>

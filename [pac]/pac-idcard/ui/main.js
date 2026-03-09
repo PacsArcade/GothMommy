@@ -10,77 +10,75 @@ $(document).ready(function () {
     var cameraActive = false;
     var shootLocked  = false;
 
-    // Filter layer refs
-    var $tint     = $('#filter-tint');
-    var $pixel    = $('#filter-pixel');
-    var $blurDiv  = $('#filter-blur-div');
-    var $acid     = $('#filter-acid');
-    var $devil    = $('#filter-devil');
+    var $solid  = $('#fl-solid');
+    var $pixel  = $('#fl-pixel');
+    var $blur   = $('#fl-blur');
+    var $acid   = $('#fl-acid');
+    var $devil  = $('#fl-devil');
     var pixelCanvas = document.getElementById('pixel-canvas');
     var pixelCtx    = pixelCanvas ? pixelCanvas.getContext('2d') : null;
-    var pixelRaf    = null;
 
-    // ── Clear all filters ─────────────────────────────────────────────
+    // ── clear all filter layers ─────────────────────────────────────────
     function clearFilters() {
-        $tint.hide().css('background', '');
-        stopPixel();
-        $blurDiv.hide().removeClass('active');
+        $solid.hide().css('background', '');
+        $pixel.hide();
+        if (pixelCtx) pixelCtx.clearRect(0, 0, pixelCanvas.width, pixelCanvas.height);
+        $blur.hide();
         $acid.hide();
         $devil.hide();
     }
 
-    // ── Pixel filter ──────────────────────────────────────────────────
-    // Draws a tiny canvas (1px per block) then CSS stretches it back to
-    // full screen with image-rendering:pixelated = chunky low-res look.
+    // ── pixelate: draw game scene at tiny resolution, scale up ──────────
+    // We can't actually capture the game render from NUI, so instead we
+    // draw a warm sepia-tinted low-res grid that mimics the chunky-pixel
+    // look when stretched over the scene.
     function startPixel(blockSize) {
-        if (pixelRaf) stopPixel();
-        var bs = blockSize || 12;
-        var w  = Math.ceil(window.innerWidth  / bs);
-        var h  = Math.ceil(window.innerHeight / bs);
+        var bs = Math.max(blockSize || 10, 4);
+        var W  = window.innerWidth;
+        var H  = window.innerHeight;
+        // Tiny canvas: 1 pixel = 1 block
+        var w  = Math.ceil(W / bs);
+        var h  = Math.ceil(H / bs);
         pixelCanvas.width  = w;
         pixelCanvas.height = h;
-        // Fill with a warm sepia tone at low res
-        pixelCtx.fillStyle = 'rgba(80, 50, 20, 0.30)';
-        pixelCtx.fillRect(0, 0, w, h);
-        // Draw a grid of slightly varying tones for the pixel effect
+        // Paint a grid of warm tones with slight variation to simulate
+        // the blocked-out appearance of a low-resolution photograph
         for (var y = 0; y < h; y++) {
             for (var x = 0; x < w; x++) {
-                var v = Math.floor(Math.random() * 30);
-                pixelCtx.fillStyle = 'rgba(' + (60+v) + ',' + (30+v) + ',' + (10+v) + ',0.18)';
+                var t  = (Math.sin(x * 0.7 + y * 0.5) + 1) / 2;   // 0..1
+                var r  = Math.round(50  + t * 30);
+                var g  = Math.round(28  + t * 18);
+                var b  = Math.round(8   + t * 10);
+                var al = (0.20 + t * 0.18).toFixed(2);
+                pixelCtx.fillStyle = 'rgba('+r+','+g+','+b+','+al+')';
                 pixelCtx.fillRect(x, y, 1, 1);
             }
         }
         $pixel.show();
-        // No rAF loop needed — static texture is enough
-    }
-    function stopPixel() {
-        if (pixelRaf) { cancelAnimationFrame(pixelRaf); pixelRaf = null; }
-        $pixel.hide();
-        if (pixelCtx) pixelCtx.clearRect(0, 0, pixelCanvas.width, pixelCanvas.height);
     }
 
-    // ── Apply filter ──────────────────────────────────────────────────
+    // ── apply filter ────────────────────────────────────────────────────
     function setFilter(d) {
         clearFilters();
         var type = d.filterType;
         if (!type) {
-            // None
-        } else if (type === 'tint') {
-            $tint.css('background', 'rgba('+d.r+','+d.g+','+d.b+','+(d.a||0.45)+')');
-            $tint.show();
-        } else if (type === 'devil') {
-            $devil.show();
+            // None — already cleared
+        } else if (type === 'solid') {
+            var bg = 'rgba(' + (d.r||0) + ',' + (d.g||0) + ',' + (d.b||0) + ',' + (d.a||0.35) + ')';
+            $solid.css('background', bg).show();
+        } else if (type === 'blur') {
+            $blur.show();
         } else if (type === 'acid') {
             $acid.show();
-        } else if (type === 'blur') {
-            $blurDiv.addClass('active').show();
+        } else if (type === 'devil') {
+            $devil.show();
         } else if (type === 'pixel') {
-            startPixel(d.size || 12);
+            startPixel(d.size || 10);
         }
         $('#filter-label').text(d.name || 'None');
     }
 
-    // ── Countdown + shoot ─────────────────────────────────────────────
+    // ── countdown + shoot ───────────────────────────────────────────────
     function doCountdownAndShoot() {
         if (shootLocked) return;
         shootLocked = true;
@@ -93,7 +91,7 @@ $(document).ready(function () {
                 setTimeout(showNext, 900);
             } else {
                 $cd.hide();
-                $flash.css({display:'block',opacity:1}).animate({opacity:0}, 500, function(){ $flash.hide(); });
+                $flash.css({display:'block',opacity:1}).animate({opacity:0},500,function(){$flash.hide();});
                 $.post('https://' + GetParentResourceName() + '/camShoot', JSON.stringify({}));
                 $('#cam-saved-toast').stop(true).css({display:'block',opacity:1}).delay(2200).fadeOut(600);
                 setTimeout(function(){ $('#cam-controls,#filter-bar').fadeIn(300); }, 700);
@@ -103,7 +101,7 @@ $(document).ready(function () {
         showNext();
     }
 
-    // ── Keyboard ──────────────────────────────────────────────────────
+    // ── keyboard ────────────────────────────────────────────────────────
     var keyMap = {
         'Numpad8':'up','Numpad2':'down','Numpad4':'left','Numpad6':'right',
         'Numpad7':'fwd','Numpad9':'back',
@@ -124,7 +122,7 @@ $(document).ready(function () {
         }));
     });
 
-    // ── ID Card ───────────────────────────────────────────────────────
+    // ── ID card ─────────────────────────────────────────────────────────
     function setupIDCard(array) {
         if (!array || typeof array !== 'object') return;
         var sex = array.sex === 'Female' ? 'F' : 'M';
@@ -147,7 +145,7 @@ $(document).ready(function () {
             .one('animationend', function(){ $(this).hide(); });
     }
 
-    // ── Form ──────────────────────────────────────────────────────────
+    // ── form ────────────────────────────────────────────────────────────
     $('#submit').click(function() {
         $.post('https://' + GetParentResourceName() + '/createIdCard', JSON.stringify({
             name:$('#name').val(), cityname:$('#cityname').val(), religious:$('#religious').val(),
@@ -198,16 +196,19 @@ $(document).ready(function () {
 
     var ShowPhoto=false, ShowIdCard=false;
 
-    // ── Message handler ───────────────────────────────────────────────
+    // ── message handler ─────────────────────────────────────────────────
     window.addEventListener('message', function(event) {
         var d = event.data;
         switch(d.action) {
-            case 'openIdCard':   ShowIdCard=true; setupIDCard(d.array); break;
-            case 'close':        closeIDCard(); break;
-            case 'print':        $('.printphoto').fadeIn(500); break;
-            case 'showphoto':    ShowPhoto=true; showPrintPhoto(d.array.img); break;
+            case 'openIdCard':    ShowIdCard=true; setupIDCard(d.array); break;
+            case 'close':         closeIDCard(); break;
+            case 'print':         $('.printphoto').fadeIn(500); break;
+            case 'showphoto':     ShowPhoto=true; showPrintPhoto(d.array.img); break;
             case 'createidcard':
-                if(d.illegal===true){ $('#cityname,#heightinput,#ageinput,#sex-man,#sex-women').removeAttr('disabled'); $('#dateinput').removeAttr('min').removeAttr('max'); }
+                if(d.illegal===true){
+                    $('#cityname,#heightinput,#ageinput,#sex-man,#sex-women').removeAttr('disabled');
+                    $('#dateinput').removeAttr('min').removeAttr('max');
+                }
                 CreateIdCardSetData(d.array, d.illegal);
                 $('.create,.previewcreate-photo').fadeIn(500);
                 break;
@@ -216,14 +217,15 @@ $(document).ready(function () {
                 break;
             case 'showCameraOverlay':
                 if(d.visible){
-                    camTarget={pcx:d.pcx||0,pcy:d.pcy||0,pcz:d.pcz||0};
-                    cameraActive=true; shootLocked=false;
+                    camTarget = { pcx:d.pcx||0, pcy:d.pcy||0, pcz:d.pcz||0 };
+                    cameraActive = true;
+                    shootLocked  = false;
                     clearFilters();
                     $('#filter-label').text('None');
                     $('#cam-controls,#filter-bar').show();
                     $('#camera-overlay').show();
                 } else {
-                    cameraActive=false;
+                    cameraActive = false;
                     clearFilters();
                     $('#camera-overlay').hide();
                     $('#filter-label').text('');

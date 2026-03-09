@@ -1,5 +1,5 @@
 -- =============================================================
-print("[pac-idcard] VERSION: 2026-03-09-v14 filter-overhaul")
+print("[pac-idcard] VERSION: 2026-03-09-v15 native-postfx-filters")
 -- =============================================================
 
 local idcardData    = false
@@ -11,11 +11,38 @@ local movements2    = {}
 local movements3    = {}
 local creating      = false
 local currentFilter = 1
+local activePostfx  = nil
 
 local exitCamera
 local setPhotographerHeading
 local cycleFilter
 local applyFilter
+
+-- Native postfx effects available in RDR3
+local POSTFX = {
+    sepia        = "MP_Celeb_Win",
+    desaturate   = "DeathFailOut",
+    redtint      = "MP_Celeb_Win_Freemode",
+    purpletint   = "SwitchOpenNeutralFIB5",
+    greentint    = "MP_Celeb_Win",
+    blur         = "SwitchHUDIn",
+    none         = nil,
+}
+
+local function stopPostfx()
+    if activePostfx then
+        AnimpostfxStop(activePostfx)
+        activePostfx = nil
+    end
+end
+
+local function playPostfx(name, looped)
+    stopPostfx()
+    if name then
+        AnimpostfxPlay(name, 0, looped)
+        activePostfx = name
+    end
+end
 
 local function createPrompt(inputName, label, promptGroup, holdMs)
     holdMs = holdMs or 500
@@ -164,6 +191,16 @@ applyFilter = function(idx)
     local f = Config.CameraFilters
     if not f or #f == 0 then return end
     local filter = f[idx] or f[1]
+
+    -- Stop any running postfx first
+    stopPostfx()
+
+    -- Play native postfx if specified
+    if filter.postfx then
+        playPostfx(filter.postfx, true)
+    end
+
+    -- Send NUI message for overlay effects
     SendNUIMessage({
         action     = 'setFilter',
         name       = filter.name,
@@ -191,6 +228,7 @@ setPhotographerHeading = function(key, heading)
 end
 
 exitCamera = function(photographerKey, restoreHeading)
+    stopPostfx()
     SendNUIMessage({ action = 'showCameraOverlay', visible = false })
     SetNuiFocus(false, false)
     RenderScriptCams(false, false, 0, true, true)
@@ -334,8 +372,7 @@ RegisterCommand("phototest", function()
     for k, v in pairs(Config.Photographers) do
         local p = photographerPeds[k]
         if p and DoesEntityExist(p) then
-            local pc = GetEntityCoords(p)
-            local dist = #(me - pc)
+            local pc = GetEntityCoords(p); local dist = #(me - pc)
             print(string.format("[phototest] '%s' ped=%d x=%.3f y=%.3f z=%.3f heading=%.1f dist=%.2f %s",
                 k, p, pc.x, pc.y, pc.z, GetEntityHeading(p), dist,
                 dist < Config.TalkDistance and "<<IN RANGE>>" or "out of range"))
@@ -429,6 +466,7 @@ end
 
 AddEventHandler('onResourceStop', function(resourceName)
     if GetCurrentResourceName() ~= resourceName then return end
+    stopPostfx()
     for _, v in pairs(Config.Photographers) do if v.blipEntity then RemoveBlip(v.blipEntity) end end
     for _, p in pairs(photographerPeds) do if p then DeletePed(p) end end
     for _, v in pairs(Config.IDCardNPC) do

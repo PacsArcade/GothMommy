@@ -108,23 +108,56 @@ Config.Religious = {
 }
 
 --[[
-  filterType values used by the NUI:
-    absent / nil  = None (no effect)
-    "tint"        = multiply colour overlay  (r,g,b,a)
-    "devil"       = purple tint + pulsing red eye-glow vignette
-    "acid"        = animated SVG turbulence warp + hue-rotate flood
-    "blur"        = CSS filter:blur applied via an animated div
-    "pixel"       = low-res scale trick (size = block pixels)
+  Filter system v15:
+    filterType values (NUI overlay):
+      nil          = None
+      "solid"      = solid colour div over scene (rgba, opaque enough to tint)
+      "pixel"      = pixelate overlay
+      "acid"       = animated SVG warp + colour flood
+      "devil"      = dark vignette + red pulsing eye-glow
+      "blur"       = frosted white haze
+
+    postfx (optional Lua native postfx played simultaneously):
+      Any AnimpostfxPlay name string, e.g. "MP_Celeb_Win"
+      These apply to the actual 3D scene render.
 ]]
 Config.CameraFilters = {
     { name = "None" },
-    { name = "Sepia",        filterType = "tint",  r=120, g=72,  b=22,  a=0.50 },
-    { name = "Thunderstorm", filterType = "tint",  r=30,  g=45,  b=80,  a=0.52 },
-    { name = "Blood Moon",   filterType = "tint",  r=160, g=10,  b=10,  a=0.45 },
-    { name = "Devil Eyes",   filterType = "devil" },
-    { name = "Acid Trip",    filterType = "acid"  },
-    { name = "Blurry",       filterType = "blur",  amount = 5 },
-    { name = "Pixelated",    filterType = "pixel", size   = 12 },
+    {
+        name       = "Sepia",
+        filterType = "solid",
+        r=100, g=60, b=10, a=0.35,
+        postfx     = "MP_Celeb_Win",
+    },
+    {
+        name       = "Thunderstorm",
+        filterType = "solid",
+        r=20, g=30, b=70, a=0.40,
+        postfx     = "DeathFailOut",
+    },
+    {
+        name       = "Blood Moon",
+        filterType = "solid",
+        r=140, g=0, b=0, a=0.38,
+    },
+    {
+        name       = "Devil Eyes",
+        filterType = "devil",
+    },
+    {
+        name       = "Acid Trip",
+        filterType = "acid",
+    },
+    {
+        name       = "Blurry",
+        filterType = "blur",
+        amount     = 6,
+    },
+    {
+        name       = "Pixelated",
+        filterType = "pixel",
+        size       = 10,
+    },
 }
 
 Config.IDCardNPC = {
