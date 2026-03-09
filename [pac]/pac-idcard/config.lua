@@ -23,8 +23,9 @@ Config.Locale = {
     ["en"] = {
         ["promptitle"]  = "Photographer",
         ["promptitle2"] = "Id Card System",
+        ["promptitle3"] = "Illegal Identity Card",
         ["takephoto"]   = "Take Photo  [G]",
-        ["printphoto"]  = "Print Photo [Enter]",
+        ["printphoto"]  = "Develop Film [Enter]",
         ["exit"]        = "Exit [Backspace]",
         ["camUp"]       = "Cam Up [Up]",
         ["camDown"]     = "Cam Down [Down]",
@@ -34,7 +35,6 @@ Config.Locale = {
         ["camBack"]     = "Zoom Out [PgDn]",
         ["filterPrev"]  = "Filter Prev [[",
         ["filterNext"]  = "Filter Next []]",
-        ["promptitle3"] = "Illegal Identity Card",
         ["takeidcard"]  = "Take Id Card",
         ["talkphoto"]   = "Talk to Photographer [E]",
         ["noimg"]          = "No picture ~COLOR_YELLOW~link~COLOR_WHITE~ entered !",
@@ -79,15 +79,23 @@ Config.Photographers = {
     ["Blackwater"] = {
         promptCoords   = vector4(-810.48, -1372.56, 43.02, 180.0),
         promptDistance = 3.5,
-        pedCoords      = vector4(-810.48, -1372.56, 43.02, 285.0),
-        camCoords      = vector4(-814.40, -1374.85, 44.90, 86.48),
-        camFov         = 60.0,
+
+        -- Where the PLAYER stands to be photographed (against the back wall, facing the camera)
+        -- heading 90.0 = player faces east (toward the tripod/camera)
+        pedCoords = vector4(-807.50, -1372.56, 43.60, 90.0),
+
+        -- Scripted camera view: positioned behind the tripod, looking west at the subject
+        -- rot.z ~270 points the cam west
+        camCoords = vector4(-813.80, -1372.56, 44.60, 270.0),
+        camFov    = 55.0,
+
         npc = {
             model    = "mp_re_photography_females_01",
             hash     = 0x5730F05E,
             fallback = "cs_brontesbutler",
-            -- 270 = facing west, toward the camera tripod and door
-            coords   = vector4(-810.48, -1372.56, 44.02, 270.0),
+            -- Stand right behind/beside the tripod, facing west (toward subject)
+            -- In RDR heading: 270 = west
+            coords   = vector4(-812.80, -1372.56, 43.60, 270.0),
         },
         blips = {
             name     = "ID Photo",
