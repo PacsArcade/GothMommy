@@ -40,7 +40,6 @@ local function RaycastFromCamera(distance)
     return nil
 end
 
--- Raycast camera to ground, return world XYZ where camera ray hits ground
 local function RaycastToGround()
     local co  = GetGameplayCamCoord()
     local rot = GetGameplayCamRot(2)
@@ -51,7 +50,6 @@ local function RaycastToGround()
     if hit == 1 then
         return hitCoords.x, hitCoords.y, hitCoords.z, hitNormal
     end
-    -- fallback: drop straight down from midpoint
     local mx, my = (co.x+far.x)/2, (co.y+far.y)/2
     local found, gz = GetGroundZFor_3dCoord(mx, my, co.z, false)
     return mx, my, gz or co.z, vector3(0,0,1)
@@ -321,7 +319,7 @@ AddEventHandler('pac_camp:client:placePropCamp', function(itemName)
     PlaceObjectOnGroundProperly(tempObj)
 
     local posX, posY, posZ = ox, oy, oz
-    local rotZ      = 0.0   -- only Z rotation via scroll
+    local rotZ      = 0.0
     local snapToGround = true
     local isPlacing    = true
     local dynRadius    = GetModelRadius(modelHash)
@@ -337,43 +335,27 @@ AddEventHandler('pac_camp:client:placePropCamp', function(itemName)
     CreateThread(function()
         while isPlacing do
             Wait(0)
-
-            -- Block scroll and G/E so game doesn't consume them
             DisableControlAction(0, Config.Keys.cancelPlace,   true)
             DisableControlAction(0, Config.Keys.confirmPlace,  true)
             DisableControlAction(0, Config.Keys.placeOnGround, true)
             DisableControlAction(0, Config.Keys.increaseSpeed, true)
             DisableControlAction(0, Config.Keys.decreaseSpeed, true)
 
-            -- Ghost prop follows camera ray to ground
             local nx, ny, nz, norm = RaycastToGround()
             if nx then
                 posX, posY = nx, ny
-                if snapToGround then
-                    posZ = nz
-                end
+                if snapToGround then posZ = nz end
             end
 
-            -- Scroll wheel rotates around Z axis
-            if IsDisabledControlJustPressed(0, Config.Keys.increaseSpeed) then
-                rotZ = rotZ + 15.0
-            end
-            if IsDisabledControlJustPressed(0, Config.Keys.decreaseSpeed) then
-                rotZ = rotZ - 15.0
-            end
+            if IsDisabledControlJustPressed(0, Config.Keys.increaseSpeed) then rotZ = rotZ + 15.0 end
+            if IsDisabledControlJustPressed(0, Config.Keys.decreaseSpeed) then rotZ = rotZ - 15.0 end
+            if IsDisabledControlJustPressed(0, Config.Keys.placeOnGround) then snapToGround = true end
 
-            -- F = snap to ground toggle
-            if IsDisabledControlJustPressed(0, Config.Keys.placeOnGround) then
-                snapToGround = true
-            end
-
-            -- Update ghost prop position
             SetEntityCoords(tempObj, posX, posY, posZ, true, true, true, false)
             SetEntityRotation(tempObj, 0.0, 0.0, rotZ, 2, true)
             if vegSphere then RemVeg(vegSphere) end
             vegSphere = AddVeg(posX, posY, posZ, dynRadius)
 
-            -- E = confirm
             if IsDisabledControlJustPressed(0, Config.Keys.confirmPlace) then
                 local _, surfNormal = GetGroundInfo(posX, posY, posZ)
                 local slope = GetSlopeAngle(surfNormal)
@@ -390,7 +372,6 @@ AddEventHandler('pac_camp:client:placePropCamp', function(itemName)
                 end
             end
 
-            -- G = cancel
             if IsDisabledControlJustPressed(0, Config.Keys.cancelPlace) then
                 isPlacing = false
                 SendNUIMessage({action="hidecamp"})
@@ -404,10 +385,13 @@ end)
 
 -- -----------------------------------------------------------------------
 -- Bedroll: sleep animation + set respawn
--- Three-strategy approach:
---   1. Scenario hash (most reliable, uses built-in NPC behaviour)
---   2. Anim dict TaskPlayAnim (fallback if scenario not available)
---   3. Plain Wait (last resort - no visible anim but respawn still sets)
+--
+-- Strategy 1: TaskStartScenarioInPlaceHash with WORLD_HUMAN_SLEEP_GROUND
+-- Strategy 2: anim dict (amb_camp@...) if scenario hash not available
+-- Strategy 3: plain Wait (no visual, but respawn still sets correctly)
+--
+-- NOTE: IsTaskActive is a GTA5/FiveM native - NOT available in RedM.
+--       We always attempt Strategy 1 directly.
 -- -----------------------------------------------------------------------
 RegisterNetEvent('pac_camp:client:useBedroll')
 AddEventHandler('pac_camp:client:useBedroll', function()
@@ -415,50 +399,46 @@ AddEventHandler('pac_camp:client:useBedroll', function()
     local coords  = GetEntityCoords(ped)
     local heading = GetEntityHeading(ped)
 
-    print('[pac-camp] useBedroll: client event received, starting sleep sequence')
+    print('[pac-camp] useBedroll: starting sleep sequence')
 
-    -- Strategy 1: scenario-based sleep (most reliable in RDR3)
+    -- Strategy 1: scenario hash (built-in RDR3 sleep behaviour)
     local scenarioHash = GetHashKey("WORLD_HUMAN_SLEEP_GROUND")
-    local usedScenario = false
-
-    if IsTaskActive(ped, 0) == false then  -- ped is idle
-        print('[pac-camp] useBedroll: trying scenario WORLD_HUMAN_SLEEP_GROUND')
+    print('[pac-camp] useBedroll: trying scenario hash ' .. tostring(scenarioHash))
+    local ok, err = pcall(function()
         TaskStartScenarioInPlaceHash(ped, scenarioHash, 5000, true, 0, 0, false)
+    end)
+    if ok then
+        print('[pac-camp] useBedroll: scenario started OK, waiting 5.5s')
         Wait(5500)
         ClearPedTasksImmediately(ped)
-        usedScenario = true
-        print('[pac-camp] useBedroll: scenario complete')
-    end
-
-    -- Strategy 2: anim dict fallback
-    if not usedScenario then
-        print('[pac-camp] useBedroll: ped busy, trying anim dict fallback')
+        print('[pac-camp] useBedroll: scenario done')
+    else
+        -- Strategy 2: anim dict fallback
+        print('[pac-camp] useBedroll: scenario failed (' .. tostring(err) .. '), trying anim dict')
         local dict = "amb_camp@world_human_sleep_ground@male@back@idle_a"
-        print('[pac-camp] useBedroll: DoesAnimDictExist = ' .. tostring(DoesAnimDictExist(dict)))
+        print('[pac-camp] useBedroll: DoesAnimDictExist=' .. tostring(DoesAnimDictExist(dict)))
         if DoesAnimDictExist(dict) then
             RequestAnimDict(dict)
             local t = 0
-            while not HasAnimDictLoaded(dict) and t < 60 do
-                Wait(50); t = t + 1
-            end
+            while not HasAnimDictLoaded(dict) and t < 60 do Wait(50); t = t + 1 end
             if HasAnimDictLoaded(dict) then
                 print('[pac-camp] useBedroll: playing anim dict')
                 TaskPlayAnim(ped, dict, "idle_a", 2.0, -2.0, 5000, 1, 0, false, false, false)
                 Wait(5000)
                 StopAnimTask(ped, dict, "idle_a", 2.0)
                 RemoveAnimDict(dict)
-                print('[pac-camp] useBedroll: anim dict complete')
             else
-                print('[pac-camp] useBedroll: anim dict failed to load, using plain wait')
+                print('[pac-camp] useBedroll: anim dict load timed out, plain wait')
                 Wait(3000)
             end
         else
-            print('[pac-camp] useBedroll: anim dict does not exist in this build, using plain wait')
+            -- Strategy 3: plain wait - no visual but respawn still saves
+            print('[pac-camp] useBedroll: anim dict not in this build, plain wait')
             Wait(3000)
         end
     end
 
-    print('[pac-camp] useBedroll: sending setBedrollRespawn to server')
+    print('[pac-camp] useBedroll: sending setBedrollRespawn')
     TriggerServerEvent('pac_camp:server:setBedrollRespawn', {x=coords.x, y=coords.y, z=coords.z, w=heading})
 end)
 
