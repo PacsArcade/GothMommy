@@ -5,9 +5,11 @@
 When adding any new FiveM/RedM resource to the server, run through this checklist:
 
 ### 1. Inventory Images
-- [ ] Find the script's item image folder (usually `images/`, `html/img/`, or `stream/`)
-- [ ] Copy `.png` item images to `[vorp]/vorp_inventory/html/img/`
-- [ ] File names must match exactly what is registered in the items SQL
+- [ ] Look in the script's source for an `items/` folder (this is the standard location for item images)
+- [ ] Common alternate locations: `html/img/items/`, `stream/`, `images/`
+- [ ] Copy the `.png` files from that `items/` folder directly into `[vorp]/vorp_inventory/html/img/`
+- [ ] Do NOT copy the whole script's `html/` or `assets/` folder — only the item images
+- [ ] File names must match exactly what is registered in the items SQL (without extension)
 
 ### 2. Items Registration
 - [ ] Check the script's SQL file for `INSERT INTO items` statements
@@ -22,17 +24,17 @@ When adding any new FiveM/RedM resource to the server, run through this checklis
 ### 4. Framework Shim
 - [ ] Confirm script targets VORP Core — strip any RSG/QBCore references
 - [ ] Check `fxmanifest.lua` for correct `game 'rdr3'` and `fx_version 'cerulean'`
-- [ ] Add version checker removal if present
+- [ ] Remove version checker if present
 
 ### 5. Config
 - [ ] Set `Config.LicensePrefix` to `GMRP`
 - [ ] Verify authorized jobs match GMRP job names
-- [ ] Check NPC coordinates are in a valid location
+- [ ] Check NPC coordinates are in a valid in-world location
 
 ### 6. Branch & Deploy
 - [ ] Create feature branch: `feat/<scriptname>`
 - [ ] Push all files
-- [ ] `git pull origin <branch>` on VPS
+- [ ] `git pull origin <branch>` on VPS (not just `git fetch`!)
 - [ ] `restart <resource>` in txAdmin
 - [ ] Run in-game checklist
 - [ ] Merge to `main` only after checklist passes
@@ -43,10 +45,10 @@ When adding any new FiveM/RedM resource to the server, run through this checklis
 
 **Items needed in vorp_inventory:**
 - `printphoto` → image: `printphoto.png`
-- `man_idcard` → image: `man_idcard.png`  
+- `man_idcard` → image: `man_idcard.png`
 - `woman_idcard` → image: `woman_idcard.png`
 
-Source images are in `[pac]/pac-idcard/ui/assets/` — copy them to `[vorp]/vorp_inventory/html/img/`
+Source images come from the **original script's `items/` folder** — copy them to `[vorp]/vorp_inventory/html/img/`
 
 **SQL to register items** (run once):
 ```sql
