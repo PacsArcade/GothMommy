@@ -2,33 +2,44 @@ Config = {}
 Config.Language = "en"
 Config.LicensePrefix = "GMRP" -- Prefix for license numbers e.g. GMRP-000123
 Config.ShowIdcardCommand = "idcard"
-Config.TakeCardType = "item" -- "item" or "sql"
+Config.TakeCardType = "sql" -- "item" or "sql" — sql = one unique ID per player
+
+-- ─── Keybinds ──────────────────────────────────────────────────────────────
+-- Arrow keys: Up=0x05CA7C52  Down=0xF5F8B500  Left=0xA65EBAB4  Right=0xDEB34313
+-- Plus (+):   0x4B38BFCA   Minus (-): 0x2A3F6CCE
+-- Comma (,):  0xCEFD9220   Period (.): 0x4B44B534
+-- G: 0x760A9C6F  Backspace: 0x156F7119  Enter: 0xC7B5340A
 Config.Keybinds = {
     ["takephoto"]  = 0x760A9C6F, -- G
     ["exit"]       = 0x156F7119, -- Backspace
-    ["camUp"]      = 0x3C3DD371, -- Page Down (zoom out)
-    ["camDown"]    = 0x446258B6, -- Page Up  (zoom in)
-    ["camLeft"]    = 0x62800C92, -- filter prev
-    ["camRight"]   = 0x8BDE7443, -- filter next
-    ["camForward"] = 0x8FD015D8, -- W
-    ["camBack"]    = 0xD27782E3, -- S
+    ["camUp"]      = 0x05CA7C52, -- Up Arrow    (move cam up)
+    ["camDown"]    = 0xF5F8B500, -- Down Arrow  (move cam down)
+    ["camLeft"]    = 0xA65EBAB4, -- Left Arrow  (move cam left)
+    ["camRight"]   = 0xDEB34313, -- Right Arrow (move cam right)
+    ["camForward"] = 0x4B38BFCA, -- Plus (+)    (zoom in)
+    ["camBack"]    = 0x2A3F6CCE, -- Minus (-)   (zoom out)
     ["printphoto"] = 0xC7B5340A, -- Enter
+    ["filterPrev"] = 0xCEFD9220, -- Comma (,)   (filter left)
+    ["filterNext"] = 0x4B44B534, -- Period (.)  (filter right)
     ["takeidcard"] = 0x2CD5343E,
 }
+
 Config.Locale = {
     ["en"] = {
         --- PROMPTS ---
         ["promptitle"]  = "Photographer",
         ["promptitle2"] = "Id Card System",
-        ["takephoto"]   = "Take Photo",
-        ["printphoto"]  = "Print Photo",
-        ["exit"]        = "Exit",
-        ["camUp"]       = "Zoom Out",
-        ["camDown"]     = "Zoom In",
-        ["camLeft"]     = "Filter Prev",
-        ["camRight"]    = "Filter Next",
-        ["camForward"]  = "Forward",
-        ["camBack"]     = "Back",
+        ["takephoto"]   = "Take Photo  [G]",
+        ["printphoto"]  = "Print Photo [Enter]",
+        ["exit"]        = "Exit [Backspace]",
+        ["camUp"]       = "Cam Up [↑]",
+        ["camDown"]     = "Cam Down [↓]",
+        ["camLeft"]     = "Cam Left [←]",
+        ["camRight"]    = "Cam Right [→]",
+        ["camForward"]  = "Zoom In [+]",
+        ["camBack"]     = "Zoom Out [-]",
+        ["filterPrev"]  = "Filter [,]",
+        ["filterNext"]  = "Filter [.]",
         ["promptitle3"] = "Illegal Identity Card",
         ["takeidcard"]  = "Take Id Card",
         --- NOTIFY -----
@@ -100,7 +111,19 @@ Config.PedSpawnDistance = 30
 Config.Religious = {
     "Christian", "Buddhist", "Wiccan", "Pagan",
     "Spiritualist", "Coven", "Vampire Cult",
-    "Jewish", "Muslim", "Atheist"
+    "Jewish", "Muslim", "Atheist", "None"
+}
+
+-- ─── Camera Filters ────────────────────────────────────────────────────────
+-- Applied via CSS filter on the camera preview overlay in the NUI
+-- filterNext (.) / filterPrev (,) cycle through these
+Config.CameraFilters = {
+    { name = "None",         css = "none" },
+    { name = "Sepia",        css = "sepia(1) contrast(1.1)" },
+    { name = "Thunderstorm", css = "grayscale(0.6) brightness(0.7) contrast(1.4) saturate(0.5)" },
+    { name = "Blood Moon",   css = "sepia(0.4) hue-rotate(-20deg) saturate(3) brightness(0.75) contrast(1.3)" },
+    { name = "Devil Eyes",   css = "sepia(0.2) hue-rotate(300deg) saturate(4) brightness(0.85) contrast(1.5)" },
+    { name = "Acid Trip",    css = "hue-rotate(90deg) saturate(8) brightness(1.1) contrast(1.4)" },
 }
 
 Config.IDCardNPC = {

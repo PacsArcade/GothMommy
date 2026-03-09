@@ -14,6 +14,11 @@
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
     </head>
 <body>
+    <!-- Camera filter overlay: sits over the game viewport during photo mode -->
+    <div id="camera-overlay" style="display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;pointer-events:none;z-index:9999;transition:filter 0.3s ease;">
+        <div id="filter-label" style="position:absolute;bottom:60px;left:50%;transform:translateX(-50%);color:#fff;font-size:18px;font-family:serif;text-shadow:1px 1px 4px #000;letter-spacing:2px;opacity:0.85;"></div>
+    </div>
+
     <div class="previewcreate-photo">
         <img id="previewphoto" src="/ui/assets/printphoto.png" alt="" srcset="">
         <img id="preview-frame" src="/ui/assets/preview-frame.png" alt="" srcset="">
@@ -33,7 +38,20 @@
             <img id="cityicon" src="/ui/assets/city.png" alt="" srcset="">
             <input type="text" name="" id="cityname" value="Blackwater" disabled>
             <img id="religiousicon" src="/ui/assets/cross.png" alt="" srcset="">
-            <input type="text" name="" id="religious" value="Christian">
+            <select id="religious">
+                <option value="">-- Select --</option>
+                <option value="Christian">Christian</option>
+                <option value="Buddhist">Buddhist</option>
+                <option value="Wiccan">Wiccan</option>
+                <option value="Pagan">Pagan</option>
+                <option value="Spiritualist">Spiritualist</option>
+                <option value="Coven">Coven</option>
+                <option value="Vampire Cult">Vampire Cult</option>
+                <option value="Jewish">Jewish</option>
+                <option value="Muslim">Muslim</option>
+                <option value="Atheist">Atheist</option>
+                <option value="None">None</option>
+            </select>
             <div class="line"></div>
         </div>
         <div class="sex-cont">

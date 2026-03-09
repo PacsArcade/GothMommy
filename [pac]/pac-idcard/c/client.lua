@@ -4,6 +4,7 @@ local currentCamPosition = nil
 local movements = {}
 local movements2 = {}
 local creating = false
+local currentFilter = 1  -- index into Config.CameraFilters
 
 local function createPrompts(keysTable, prompts)
     local array = {}
@@ -27,6 +28,10 @@ end
 local prompts  = GetRandomIntInRange(0, 0xffffff)
 local prompts2 = GetRandomIntInRange(0, 0xffffff)
 
+-- prompt index map: 1=takephoto 2=printphoto 3=exit
+--                   4=camUp 5=camDown 6=camLeft 7=camRight
+--                   8=camForward(zoom in) 9=camBack(zoom out)
+--                   10=filterPrev 11=filterNext
 local keysTable = {
     {Locale("takephoto"),  Config.Keybinds["takephoto"]},
     {Locale("printphoto"), Config.Keybinds["printphoto"]},
@@ -37,6 +42,8 @@ local keysTable = {
     {Locale("camRight"),   Config.Keybinds["camRight"]},
     {Locale("camForward"), Config.Keybinds["camForward"]},
     {Locale("camBack"),    Config.Keybinds["camBack"]},
+    {Locale("filterPrev"), Config.Keybinds["filterPrev"]},
+    {Locale("filterNext"), Config.Keybinds["filterNext"]},
 }
 
 local keysTable2 = {
@@ -49,7 +56,7 @@ Citizen.CreateThread(function()
     movements2 = createPrompts(keysTable2, prompts2)
 end)
 
--- ── NUI Callbacks ─────────────────────────────────────────
+-- ─── NUI Callbacks ──────────────────────────────────────────────────────────
 RegisterNUICallback('close', function()
     SetNuiFocus(false, false)
     AnimpostfxStop("OJDominoBlur")
@@ -72,12 +79,11 @@ RegisterNUICallback('createIdCard', function(data)
     TriggerServerEvent('fx-idcard:server:buyIdCard', data)
 end)
 
--- ── Network Events ────────────────────────────────────────
+-- ─── Network Events ─────────────────────────────────────────────────────────
 RegisterNetEvent('fx-idcard:client:setData', function(data)
     idcardData = data
 end)
 
--- Called when ID card is revoked or no record found
 RegisterNetEvent('fx-idcard:client:clearData', function()
     idcardData = false
 end)
@@ -125,7 +131,7 @@ RegisterNetEvent("fx-idcard:client:ShowUi", function(typee, data)
     end
 end)
 
--- ── Helpers ───────────────────────────────────────────────
+-- ─── Helpers ────────────────────────────────────────────────────────────────
 function GetClosestPlayer()
     local players        = GetActivePlayers()
     local playerPed      = PlayerPedId()
@@ -146,13 +152,24 @@ end
 local function setActivePrompts(Type)
     local show = {}
     if Type == "photo" then
-        show = {true,true,false,false,false,false,false,false,false}
+        -- show takephoto, printphoto only
+        show = {true,true,false,false,false,false,false,false,false,false,false}
     elseif Type == "camera" then
-        show = {false,false,true,true,true,true,true,true,true}
+        -- show exit + all camera controls + filter keys
+        show = {false,false,true,true,true,true,true,true,true,true,true}
     end
     for i, v in ipairs(show) do
-        Citizen.InvokeNative(0x71215ACCFDE075EE, movements[i], v)
+        if movements[i] then
+            Citizen.InvokeNative(0x71215ACCFDE075EE, movements[i], v)
+        end
     end
+end
+
+local function applyFilter(index)
+    local filters = Config.CameraFilters
+    if not filters or #filters == 0 then return end
+    local filter = filters[index] or filters[1]
+    SendNUIMessage({ action = 'setFilter', css = filter.css, name = filter.name })
 end
 
 local function changeCamPosition(x, y, z)
@@ -162,6 +179,18 @@ local function changeCamPosition(x, y, z)
     if #(coords - currentCamPosition) < 1.5 then
         SetCamCoord(cam, currentCamPosition.x, currentCamPosition.y, currentCamPosition.z)
     end
+end
+
+local filterCooldown = false
+local function cycleFilter(dir)
+    if filterCooldown then return end
+    filterCooldown = true
+    local filters = Config.CameraFilters
+    currentFilter = currentFilter + dir
+    if currentFilter < 1 then currentFilter = #filters end
+    if currentFilter > #filters then currentFilter = 1 end
+    applyFilter(currentFilter)
+    Citizen.SetTimeout(200, function() filterCooldown = false end)
 end
 
 local function takePhoto(v)
@@ -183,12 +212,19 @@ local function takePhoto(v)
     Wait(1000)
     DoScreenFadeIn(1000)
 
+    -- reset filter to None on each new photo session
+    currentFilter = 1
+    applyFilter(currentFilter)
+    SendNUIMessage({ action = 'showCameraOverlay', visible = true })
+
     Citizen.CreateThread(function()
         while cam do
             local title = CreateVarString(10, 'LITERAL_STRING', "Photographer")
             PromptSetActiveGroupThisFrame(prompts, title)
             setActivePrompts("camera")
+
             if IsDisabledControlPressed(0, Config.Keybinds["exit"]) then
+                SendNUIMessage({ action = 'showCameraOverlay', visible = false })
                 RenderScriptCams(false, false, 0, true, true)
                 DestroyCam(cam, true)
                 cam = nil
@@ -205,16 +241,20 @@ local function takePhoto(v)
             elseif IsDisabledControlPressed(0, Config.Keybinds["camRight"]) then
                 changeCamPosition(0, 0.01, 0)
             elseif IsDisabledControlPressed(0, Config.Keybinds["camForward"]) then
-                changeCamPosition(-0.01, 0, 0)
+                changeCamPosition(-0.01, 0, 0)  -- zoom in
             elseif IsDisabledControlPressed(0, Config.Keybinds["camBack"]) then
-                changeCamPosition(0.01, 0, 0)
+                changeCamPosition(0.01, 0, 0)   -- zoom out
+            elseif IsDisabledControlJustPressed(0, Config.Keybinds["filterNext"]) then
+                cycleFilter(1)
+            elseif IsDisabledControlJustPressed(0, Config.Keybinds["filterPrev"]) then
+                cycleFilter(-1)
             end
             Wait(1)
         end
     end)
 end
 
--- ── Photographer NPC spawn thread ─────────────────────────
+-- ─── Photographer NPC thread ─────────────────────────────────────────────────
 Citizen.CreateThread(function()
     while true do
         local sleep = 2000
@@ -228,8 +268,7 @@ Citizen.CreateThread(function()
                 if Config.Prices.printphoto then
                     label = Locale("promptitle") .. " $" .. Config.Prices.printphoto
                 end
-                local title = CreateVarString(10, 'LITERAL_STRING', label)
-                PromptSetActiveGroupThisFrame(prompts, title)
+                PromptSetActiveGroupThisFrame(prompts, CreateVarString(10, 'LITERAL_STRING', label))
                 setActivePrompts("photo")
                 if PromptHasHoldModeCompleted(movements[1]) then
                     sleep = 2000
@@ -246,7 +285,7 @@ Citizen.CreateThread(function()
     end
 end)
 
--- ── ID Card NPC spawn + interact thread ───────────────────
+-- ─── ID Card NPC spawn + interact ───────────────────────────────────────────
 local function isOpen(settings)
     if not settings then return true end
     local time = GetClockHours()
@@ -262,7 +301,6 @@ local function spawnPed(v, coords)
         Citizen.Wait(10)
         timeout = timeout + 10
         if timeout > 5000 then
-            -- fallback model
             if v.npc and v.npc.fallback then
                 modelHash = GetHashKey(v.npc.fallback)
                 RequestModel(modelHash)
@@ -307,7 +345,7 @@ Citizen.CreateThread(function()
         for k, v in pairs(Config.IDCardNPC) do
             local dist = #(coords - vector3(v.coords.x, v.coords.y, v.coords.z))
             if dist < Config.PedSpawnDistance and not v.npcEntity and isOpen(v.timeSettings) then
-                v.npcEntity  = spawnPed(v, v.coords)
+                v.npcEntity   = spawnPed(v, v.coords)
                 v.canInteract = true
             elseif v.npcEntity and (dist > Config.PedSpawnDistance or not isOpen(v.timeSettings)) then
                 DeletePed(v.npcEntity)
@@ -353,14 +391,14 @@ Citizen.CreateThread(function()
     end
 end)
 
--- ── /idcard command (sql mode) ────────────────────────────
+-- ─── /idcard command (sql mode) ─────────────────────────────────────────────
 if Config.TakeCardType == "sql" then
     RegisterCommand(Config.ShowIdcardCommand, function()
         TriggerEvent("fx-idcard:client:showIDCardSQL")
     end)
 end
 
--- ── Cleanup on resource stop ──────────────────────────────
+-- ─── Cleanup ────────────────────────────────────────────────────────────────
 AddEventHandler('onResourceStop', function(resourceName)
     if GetCurrentResourceName() ~= resourceName then return end
     for k, v in pairs(Config.IDCardNPC) do
@@ -368,6 +406,7 @@ AddEventHandler('onResourceStop', function(resourceName)
         if v.blipEntity then RemoveBlip(v.blipEntity) end
     end
     if cam then
+        SendNUIMessage({ action = 'showCameraOverlay', visible = false })
         RenderScriptCams(false, false, 0, true, true)
         DestroyCam(cam, true)
         cam = nil
