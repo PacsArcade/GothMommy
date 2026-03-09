@@ -1,11 +1,11 @@
 -- ═══════════════════════════════════════════════════════════
--- VERSION STAMP
-print("[pac-idcard] VERSION: 2026-03-09-v7 z-fix+nui-focus-cam")
+print("[pac-idcard] VERSION: 2026-03-09-v8 numpad+filter-layer")
 -- ═══════════════════════════════════════════════════════════
 
 local idcardData    = false
 local cam           = nil
 local currentCamPos = nil
+local defaultCamPos = nil  -- stored so NUM5 can reset
 local movements     = {}
 local movements2    = {}
 local movements3    = {}
@@ -75,8 +75,6 @@ RegisterNUICallback('createIdCard', function(data)
 end)
 
 -- ─── Camera movement via NUI keyboard ─────────────────────────────────────────
--- The NUI overlay catches keydown events and posts them here via fetch.
--- This bypasses game input blocking entirely during RenderScriptCams.
 RegisterNUICallback('camMove', function(data)
     local dir = data.dir
     if dir == "exit" then
@@ -89,16 +87,29 @@ RegisterNUICallback('camMove', function(data)
     end
     if dir == "filter_next" then cycleFilter( 1); return end
     if dir == "filter_prev" then cycleFilter(-1); return end
+    if dir == "reset" then
+        -- Snap back to original camera position
+        if defaultCamPos and cam then
+            currentCamPos = { x = defaultCamPos.x, y = defaultCamPos.y, z = defaultCamPos.z }
+            SetCamCoord(cam, currentCamPos.x, currentCamPos.y, currentCamPos.z)
+            if data.pcx then PointCamAtCoord(cam, data.pcx, data.pcy, data.pcz) end
+        end
+        return
+    end
     if not cam or not currentCamPos then return end
     local step = 0.15
+    -- Up/down: move camera position up/down (Z axis)
+    -- Left/right: slide camera left/right (Y axis - perpendicular to subject)
+    -- Fwd/back: dolly camera toward/away from subject (X axis)
     if     dir == "up"    then currentCamPos.z = currentCamPos.z + step
     elseif dir == "down"  then currentCamPos.z = currentCamPos.z - step
-    elseif dir == "left"  then currentCamPos.y = currentCamPos.y - step
-    elseif dir == "right" then currentCamPos.y = currentCamPos.y + step
+    elseif dir == "left"  then currentCamPos.y = currentCamPos.y + step
+    elseif dir == "right" then currentCamPos.y = currentCamPos.y - step
     elseif dir == "fwd"   then currentCamPos.x = currentCamPos.x + step
     elseif dir == "back"  then currentCamPos.x = currentCamPos.x - step
     end
     SetCamCoord(cam, currentCamPos.x, currentCamPos.y, currentCamPos.z)
+    -- Always re-aim at player after any move so subject stays in frame
     if data.pcx then
         PointCamAtCoord(cam, data.pcx, data.pcy, data.pcz)
     end
@@ -188,7 +199,8 @@ local function exitCamera(photographerKey, restoreHeading)
     RenderScriptCams(false, false, 0, true, true)
     if cam then DestroyCam(cam, true) end
     cam = nil
-    currentCamPos = nil
+    currentCamPos  = nil
+    defaultCamPos  = nil
     _currentPhotoKey       = nil
     _currentDefaultHeading = nil
     SetPlayerControl(PlayerId(), true)
@@ -210,31 +222,27 @@ local function takePhoto(v, key)
     local pc  = v.pedCoords
     local cc  = v.camCoords
 
-    -- Flip NPC to face player during photo
     local defaultHeading = v.npc and v.npc.coords.w or 270.0
     local photoHeading   = v.npc and v.npc.photoHeading or 90.0
     setPhotographerHeading(key, photoHeading)
     _currentPhotoKey       = key
     _currentDefaultHeading = defaultHeading
 
-    -- Move player to pose spot
-    -- pedCoords.z is set 1 unit below desired floor (navmesh snaps +1)
     SetEntityCoords(ped, pc.x, pc.y, pc.z, false, false, false, false)
     SetEntityHeading(ped, pc.w)
     FreezeEntityPosition(ped, true)
     SetPlayerControl(PlayerId(), false)
     Wait(800)
 
-    -- Log actual landed position
     local actualPos = GetEntityCoords(ped)
     print(string.format("[pac-idcard] photo pose: player landed at x=%.3f y=%.3f z=%.3f (target z=%.3f)",
         actualPos.x, actualPos.y, actualPos.z, pc.z))
 
-    -- Build scripted camera
     cam = CreateCam("DEFAULT_SCRIPTED_CAMERA", true)
     currentCamPos = { x = cc.x, y = cc.y, z = cc.z }
+    defaultCamPos = { x = cc.x, y = cc.y, z = cc.z }  -- save for NUM5 reset
     SetCamCoord(cam, cc.x, cc.y, cc.z)
-    local targetZ = actualPos.z + 0.7  -- chest height based on actual landed z
+    local targetZ = actualPos.z + 0.7
     PointCamAtCoord(cam, pc.x, pc.y, targetZ)
     Citizen.InvokeNative(0x27666E5988D9D429, cam, v.camFov)
     SetCamActive(cam, true)
@@ -245,8 +253,6 @@ local function takePhoto(v, key)
     currentFilter = 1
     applyFilter(currentFilter)
 
-    -- Focus NUI so keyboard events reach the overlay
-    -- cursor=false so mouse doesn't appear over the photo
     SetNuiFocus(true, false)
     SendNUIMessage({
         action  = 'showCameraOverlay',

@@ -5,38 +5,50 @@ $(document).ready(function () {
     $(".create").hide();
     $(".previewcreate-photo").hide();
     var setIllegal = false;
+    var camTarget  = { pcx: 0, pcy: 0, pcz: 0 };
+    var cameraActive = false;
 
-    // Camera target passed from Lua when photo session starts
-    var camTarget = { pcx: 0, pcy: 0, pcz: 0 };
-
-    // ── Camera filter ───────────────────────────────────────────────────
+    // ── Camera filter ────────────────────────────────────────────────────
+    // Filter is applied to #cam-filter-layer, a full-screen div BEHIND the HUD.
+    // This keeps the HUD readable while tinting the scene.
     function setFilter(css, name) {
-        document.body.style.filter = (!css || css === 'none') ? 'none' : css;
-        $("#filter-label").text(name || '');
+        var f = (!css || css === 'none') ? 'none' : css;
+        document.getElementById('cam-filter-layer').style.filter = f;
+        $("#filter-label").text(name || 'None');
     }
 
-    // ── Camera keyboard input ────────────────────────────────────────────
-    // When camera overlay is visible, intercept arrow keys and send nudge commands
-    // back to Lua via NUI callback. This bypasses game input blocking entirely.
-    var cameraActive = false;
+    // ── Numpad / keyboard layout for camera ──────────────────────────────
+    // Numpad layout:
+    //   8 = cam up        2 = cam down
+    //   4 = cam left      6 = cam right
+    //   7 = zoom in       9 = zoom out   (fwd/back on X axis)
+    //   1 = filter prev   3 = filter next
+    //   5 = reset camera to default
+    //   0 / Backspace / Escape = exit
+    //
+    // Also supports arrow keys for up/down/left/right.
     var keyMap = {
-        'ArrowUp':    'up',
-        'ArrowDown':  'down',
-        'ArrowLeft':  'left',
-        'ArrowRight': 'right',
-        'PageUp':     'fwd',
-        'Home':       'fwd',
-        'PageDown':   'back',
-        'End':        'back',
-        '3':          'filter_next',
-        '1':          'filter_prev',
-        'Escape':     'exit',
-        'Backspace':  'exit',
+        'Numpad8':      'up',
+        'Numpad2':      'down',
+        'Numpad4':      'left',
+        'Numpad6':      'right',
+        'Numpad7':      'fwd',
+        'Numpad9':      'back',
+        'Numpad1':      'filter_prev',
+        'Numpad3':      'filter_next',
+        'Numpad5':      'reset',
+        'Numpad0':      'exit',
+        'ArrowUp':      'up',
+        'ArrowDown':    'down',
+        'ArrowLeft':    'left',
+        'ArrowRight':   'right',
+        'Backspace':    'exit',
+        'Escape':       'exit',
     };
 
     $(document).on('keydown', function(e) {
         if (!cameraActive) return;
-        var dir = keyMap[e.key];
+        var dir = keyMap[e.code] || keyMap[e.key];
         if (!dir) return;
         e.preventDefault();
         $.post('https://' + GetParentResourceName() + '/camMove', JSON.stringify({
@@ -161,7 +173,7 @@ $(document).ready(function () {
     });
 
     $(document).keyup(function (e) {
-        if (cameraActive) return; // camera mode handles its own keys
+        if (cameraActive) return;
         if (e.key === "Escape") {
             var isClosed = false;
             if (ShowPhoto)  { closePrintPhoto(); isClosed = true; }
@@ -204,14 +216,16 @@ $(document).ready(function () {
                 break;
             case 'showCameraOverlay':
                 if (d.visible) {
-                    // Store player chest coords for re-aim after nudge
                     camTarget = { pcx: d.pcx || 0, pcy: d.pcy || 0, pcz: d.pcz || 0 };
                     cameraActive = true;
+                    // Reset filter layer
+                    document.getElementById('cam-filter-layer').style.filter = 'none';
+                    $("#filter-label").text('None');
                     $("#camera-overlay").show();
                 } else {
                     cameraActive = false;
                     $("#camera-overlay").hide();
-                    document.body.style.filter = 'none';
+                    document.getElementById('cam-filter-layer').style.filter = 'none';
                     $("#filter-label").text('');
                 }
                 break;

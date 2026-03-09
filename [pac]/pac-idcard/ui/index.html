@@ -13,44 +13,204 @@
         <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
         <style>
-            /* Darker form background so labels are readable */
+            * { box-sizing: border-box; }
+
+            /* ── Form theme ── */
             .create {
                 background: rgba(10, 6, 2, 0.92) !important;
                 color: #e8d8b0 !important;
             }
-            .create .label, .create span {
-                color: #c8a96e !important;
-            }
+            .create .label, .create span { color: #c8a96e !important; }
             .create input, .create select {
                 background: rgba(30, 18, 5, 0.85) !important;
                 color: #f0e0b0 !important;
                 border-color: #6b4c20 !important;
             }
-            .create select option {
-                background: #1a0e03;
-                color: #f0e0b0;
+            .create select option { background: #1a0e03; color: #f0e0b0; }
+            .create h1, .create h2 { color: #d4a843 !important; }
+            .name-cont { display: flex; flex-direction: column; gap: 6px; }
+            .name-cont .label { margin-bottom: 2px; }
+            .name-cont input#name { margin-top: 4px; }
+
+            /* ── Camera filter layer (scene tint) ── */
+            #cam-filter-layer {
+                display: none;
+                position: fixed;
+                top: 0; left: 0;
+                width: 100vw; height: 100vh;
+                pointer-events: none;
+                z-index: 9990;
+                transition: filter 0.25s ease;
             }
-            .create h1, .create h2 {
-                color: #d4a843 !important;
+
+            /* ── Camera overlay (HUD on top of filter) ── */
+            #camera-overlay {
+                display: none;
+                position: fixed;
+                top: 0; left: 0;
+                width: 100vw; height: 100vh;
+                pointer-events: none;
+                z-index: 9999;
             }
-            /* Fix: push name input down so it doesn't overlap the label */
-            .name-cont {
+
+            /* ── Filter bar (bottom center) ── */
+            #filter-bar {
+                position: absolute;
+                bottom: 38px;
+                left: 50%;
+                transform: translateX(-50%);
+                display: flex;
+                align-items: center;
+                gap: 14px;
+                background: rgba(10,6,2,0.72);
+                border: 1px solid #8b6914;
+                border-radius: 4px;
+                padding: 6px 18px;
+                pointer-events: none;
+            }
+            .filter-key {
+                font-family: 'Georgia', serif;
+                font-size: 13px;
+                color: #8b6914;
+                background: rgba(20,12,2,0.85);
+                border: 1px solid #6b4c20;
+                border-radius: 3px;
+                padding: 2px 7px;
+                letter-spacing: 1px;
+            }
+            #filter-label {
+                font-family: 'Georgia', serif;
+                font-size: 17px;
+                color: #e8d8b0;
+                letter-spacing: 3px;
+                text-shadow: 1px 1px 6px #000, 0 0 12px #8b6914;
+                min-width: 120px;
+                text-align: center;
+            }
+
+            /* ── Controls panel (right side) ── */
+            #cam-controls {
+                position: absolute;
+                top: 50%;
+                right: 32px;
+                transform: translateY(-50%);
                 display: flex;
                 flex-direction: column;
                 gap: 6px;
+                pointer-events: none;
             }
-            .name-cont .label {
+            .cam-ctrl-row {
+                display: flex;
+                align-items: center;
+                justify-content: flex-end;
+                gap: 10px;
+            }
+            .cam-ctrl-label {
+                font-family: 'Georgia', serif;
+                font-size: 13px;
+                color: #c8a96e;
+                text-shadow: 1px 1px 4px #000;
+                text-align: right;
+                text-transform: uppercase;
+                letter-spacing: 1px;
+            }
+            .cam-ctrl-key {
+                font-family: 'Georgia', serif;
+                font-size: 12px;
+                color: #e8d8b0;
+                background: rgba(10,6,2,0.80);
+                border: 1px solid #8b6914;
+                border-radius: 3px;
+                padding: 3px 9px;
+                min-width: 36px;
+                text-align: center;
+                text-shadow: none;
+                box-shadow: 0 1px 4px rgba(0,0,0,0.7);
+                letter-spacing: 1px;
+            }
+            .cam-ctrl-divider {
+                height: 1px;
+                background: rgba(139,105,20,0.35);
+                margin: 3px 0;
+            }
+            /* Section header inside controls */
+            .cam-ctrl-section {
+                font-family: 'Georgia', serif;
+                font-size: 11px;
+                color: #8b6914;
+                text-align: right;
+                letter-spacing: 2px;
+                text-transform: uppercase;
                 margin-bottom: 2px;
-            }
-            .name-cont input#name {
-                margin-top: 4px;
             }
         </style>
     </head>
 <body>
-    <!-- Camera filter overlay -->
-    <div id="camera-overlay" style="display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;pointer-events:none;z-index:9999;transition:filter 0.3s ease;">
-        <div id="filter-label" style="position:absolute;bottom:60px;left:50%;transform:translateX(-50%);color:#fff;font-size:18px;font-family:serif;text-shadow:1px 1px 4px #000;letter-spacing:2px;opacity:0.85;"></div>
+
+    <!-- Scene colour/filter tint layer (behind HUD) -->
+    <div id="cam-filter-layer"></div>
+
+    <!-- Camera overlay: filter bar + controls panel -->
+    <div id="camera-overlay">
+
+        <!-- Filter bar bottom-centre -->
+        <div id="filter-bar">
+            <span class="filter-key">NUM 1</span>
+            <span id="filter-label">None</span>
+            <span class="filter-key">NUM 3</span>
+        </div>
+
+        <!-- Controls panel right side -->
+        <div id="cam-controls">
+            <div class="cam-ctrl-section">Photographer</div>
+
+            <div class="cam-ctrl-row">
+                <span class="cam-ctrl-label">Filter Next</span>
+                <span class="cam-ctrl-key">NUM 3</span>
+            </div>
+            <div class="cam-ctrl-row">
+                <span class="cam-ctrl-label">Filter Prev</span>
+                <span class="cam-ctrl-key">NUM 1</span>
+            </div>
+
+            <div class="cam-ctrl-divider"></div>
+
+            <div class="cam-ctrl-row">
+                <span class="cam-ctrl-label">Cam Up</span>
+                <span class="cam-ctrl-key">NUM 8</span>
+            </div>
+            <div class="cam-ctrl-row">
+                <span class="cam-ctrl-label">Cam Down</span>
+                <span class="cam-ctrl-key">NUM 2</span>
+            </div>
+            <div class="cam-ctrl-row">
+                <span class="cam-ctrl-label">Cam Left</span>
+                <span class="cam-ctrl-key">NUM 4</span>
+            </div>
+            <div class="cam-ctrl-row">
+                <span class="cam-ctrl-label">Cam Right</span>
+                <span class="cam-ctrl-key">NUM 6</span>
+            </div>
+            <div class="cam-ctrl-row">
+                <span class="cam-ctrl-label">Zoom In</span>
+                <span class="cam-ctrl-key">NUM 7</span>
+            </div>
+            <div class="cam-ctrl-row">
+                <span class="cam-ctrl-label">Zoom Out</span>
+                <span class="cam-ctrl-key">NUM 9</span>
+            </div>
+            <div class="cam-ctrl-row">
+                <span class="cam-ctrl-label">Reset Cam</span>
+                <span class="cam-ctrl-key">NUM 5</span>
+            </div>
+
+            <div class="cam-ctrl-divider"></div>
+
+            <div class="cam-ctrl-row">
+                <span class="cam-ctrl-label">Exit</span>
+                <span class="cam-ctrl-key">NUM 0</span>
+            </div>
+        </div>
     </div>
 
     <div class="previewcreate-photo">
