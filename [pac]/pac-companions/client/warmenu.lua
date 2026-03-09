@@ -1,5 +1,5 @@
 -- Based on Malik's and Blue's animal shelters and vorp animal shelter --
-
+-- Modified for Goth Mommy RP: dark gold header theme replacing upstream red --
 
 WarMenu = { }
 
@@ -24,7 +24,7 @@ local descHeight = 0.030
 local menuWidth = 0.200
 
 local buttonHeight = 0.038
-local buttonFont = 6
+local buttonFont = 4  -- Georgia-style serif (font 4 = RDR2 serif, matches photographer UI)
 local buttonScale = 0.365
 
 local buttonTextXOffset = 0.003
@@ -123,10 +123,21 @@ local function drawTitle()
 		local y = menus[currentMenu].y + titleHeight / 2
 
 		if HasStreamedTextureDictLoaded("menu_textures") then
-			DrawSprite("menu_textures", "translate_bg_1a", x, y, menus[currentMenu].width + .03, titleHeight, 0.0, 150, 2, 2, 255, 0)
+			-- Dark background panel
+			DrawSprite("menu_textures", "translate_bg_1a", x, y, menus[currentMenu].width + .03, titleHeight, 0.0,
+				menus[currentMenu].titleBackgroundColor.r,
+				menus[currentMenu].titleBackgroundColor.g,
+				menus[currentMenu].titleBackgroundColor.b,
+				menus[currentMenu].titleBackgroundColor.a, 0)
+			-- Gold accent bar at the bottom of the title
+			DrawSprite("menu_textures", "translate_bg_1a", x, menus[currentMenu].y + titleHeight - 0.003,
+				menus[currentMenu].width + .03, 0.005, 0.0, 139, 105, 20, 200, 0)
 		end
 
-		drawText(menus[currentMenu].title, x, y - titleHeight / 2 + titleYOffset, menus[currentMenu].titleFont, { r = 255, g = 255, b = 255, a = 255 } , titleScale, true, true, false)
+		drawText(menus[currentMenu].title, x, y - titleHeight / 2 + titleYOffset,
+			menus[currentMenu].titleFont,
+			{ r = 212, g = 168, b = 67, a = 255 },  -- gold title text
+			titleScale, true, true, false)
 	end
 end
 
@@ -136,7 +147,7 @@ local function drawSubTitle()
 		local x = menus[currentMenu].x + menus[currentMenu].width / 2
 		local y = menus[currentMenu].y + titleHeight + buttonHeight / 2
 
-		local subTitleColor = { r = 255, g = 255, b = 255, a = 255 }
+		local subTitleColor = { r = 200, g = 168, b = 110, a = 255 }  -- warm parchment tone
 
 		if HasStreamedTextureDictLoaded("generic_textures") then
 			SetScriptGfxDrawOrder(1)
@@ -182,12 +193,13 @@ local function drawButton(text, subText)
 		if menus[currentMenu].currentOption == optionCount then
 			if HasStreamedTextureDictLoaded("generic_textures") then
 				SetScriptGfxDrawOrder(1)
-				DrawSprite("generic_textures", "selection_box_bg_1d", x, y - 0.002, menus[currentMenu].width+ 0.01, buttonHeight, 0.0, 255, 255, 255, 255, 0)
+				-- Gold-tinted highlight for selected row
+				DrawSprite("generic_textures", "selection_box_bg_1d", x, y - 0.002, menus[currentMenu].width+ 0.01, buttonHeight, 0.0, 212, 168, 67, 200, 0)
 			end
 		else
 			if HasStreamedTextureDictLoaded("generic_textures") then
 				SetScriptGfxDrawOrder(1)
-				DrawSprite("generic_textures", "selection_box_bg_1d", x, y - 0.002, menus[currentMenu].width+ 0.01, buttonHeight, 0.0, 0, 0, 0, 255, 0)
+				DrawSprite("generic_textures", "selection_box_bg_1d", x, y - 0.002, menus[currentMenu].width+ 0.01, buttonHeight, 0.0, 0, 0, 0, 200, 0)
 			end
 		end
 
@@ -291,23 +303,24 @@ function WarMenu.CreateMenu(id, title)
 
 	menus[id].footer = buttonHeight * ( menus[id].maxOptionCount + 1 )
 
-	menus[id].titleFont = 6
-	menus[id].titleColor = { r = 255, g = 255, b = 255, a = 255 }
-	menus[id].titleBackgroundColor = { r = 186, g = 2, b = 2, a = 255 }
+	menus[id].titleFont = 4  -- RDR2 serif font, matches photographer UI
+	menus[id].titleColor = { r = 212, g = 168, b = 67, a = 255 }  -- gold
+	-- Dark background with subtle warmth — replaces upstream red (r=186,g=2,b=2)
+	menus[id].titleBackgroundColor = { r = 10, g = 6, b = 2, a = 245 }
 	menus[id].titleBackgroundSprite = nil
 
 	menus[id].SliderColor = { r = 57, g = 116, b = 200, a = 255 }
 	menus[id].SliderBackgroundColor = { r = 4, g = 32, b = 57, a = 255 }
 
-	menus[id].menuTextColor = { r = 255, g = 255, b = 255, a = 255 }
-	menus[id].menuSubTextColor = { r = 189, g = 189, b = 189, a = 255 }
-	menus[id].menuFocusTextColor = { r = 0, g = 0, b = 0, a = 255 }
-	menus[id].menuFocusBackgroundColor = { r = 245, g = 245, b = 245, a = 255 }
+	menus[id].menuTextColor = { r = 240, g = 224, b = 176, a = 255 }  -- warm parchment
+	menus[id].menuSubTextColor = { r = 189, g = 149, b = 90, a = 255 }  -- muted gold
+	menus[id].menuFocusTextColor = { r = 10, g = 6, b = 2, a = 255 }  -- dark on gold highlight
+	menus[id].menuFocusBackgroundColor = { r = 212, g = 168, b = 67, a = 220 }  -- gold row
 	menus[id].menuBackgroundColor = { r = 0, g = 0, b = 0, a = 160 }
 
 	menus[id].subTitleBackgroundColor = { r = menus[id].menuBackgroundColor.r, g = menus[id].menuBackgroundColor.g, b = menus[id].menuBackgroundColor.b, a = 255 }
 
-	menus[id].buttonPressedSound = { name = "SELECT", set = "HUD_FRONTEND_DEFAULT_SOUNDSET" } --https://pastebin.com/0neZdsZ5
+	menus[id].buttonPressedSound = { name = "SELECT", set = "HUD_FRONTEND_DEFAULT_SOUNDSET" }
 end
 
 
@@ -541,20 +554,20 @@ function WarMenu.Display()
 	end
 end
 
-local k_delay = 180 -- 1er Delay
-local k_delay2 = 160 -- puis 2 3 et 4ème delay
-local k_delay3 = 130 -- et si touche restée appuyée.
+local k_delay = 180
+local k_delay2 = 160
+local k_delay3 = 130
 
 function isPressedKey(key)
-	if key ~= lastKey and IsDisabledControlPressed(1, key) then -- Pas la même touche -> RESET
+	if key ~= lastKey and IsDisabledControlPressed(1, key) then
 		lastKey = key
 		timer = GetGameTimer()
 		count = 0
 		pass = false
 		return true
 
-	elseif key == lastKey and IsDisabledControlPressed(1, key) then -- Meme Touche
-		if pass then 										-- Accélération du défilement
+	elseif key == lastKey and IsDisabledControlPressed(1, key) then
+		if pass then
 			count = 0
 			if GetGameTimer() - timer > k_delay3 and GetGameTimer() - timer < k_delay then
 				timer = GetGameTimer()
