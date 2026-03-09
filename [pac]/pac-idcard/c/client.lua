@@ -3,11 +3,10 @@ local cam           = 0
 local currentCamPos = nil
 local movements     = {}
 local movements2    = {}
-local movements3    = {}  -- photographer talk + print prompts
 local creating      = false
 local currentFilter = 1
 
--- ─── Prompt setup ───────────────────────────────────────────────────────
+-- ─── Prompt setup (camera controls + idcard NPC only) ───────────────────────
 local function createPrompts(keysTable, promptGroup)
     local array = {}
     for _, keyData in ipairs(keysTable) do
@@ -28,7 +27,6 @@ end
 
 local promptGroup1 = GetRandomIntInRange(0, 0xffffff)  -- camera mode controls
 local promptGroup2 = GetRandomIntInRange(0, 0xffffff)  -- id card NPC
-local promptGroup3 = GetRandomIntInRange(0, 0xffffff)  -- photographer NPC (talk + print)
 
 local keysTable1 = {
     { Locale("takephoto"),  Config.Keybinds["takephoto"]  },
@@ -46,24 +44,32 @@ local keysTable1 = {
 local keysTable2 = {
     { Locale("takeidcard"), Config.Keybinds["takeidcard"] },
 }
--- Photographer NPC: two prompts in same group
---   [1] Talk / enter camera mode  (E hold)
---   [2] Print Photo / open link box  (Enter hold) — only shown when NOT in camera
-local keysTable3 = {
-    { Locale("talkphoto"),  Config.Keybinds["takeidcard"] },  -- E
-    { Locale("printphoto"), Config.Keybinds["printphoto"] },  -- Enter
-}
 
 Citizen.CreateThread(function()
     Citizen.Wait(10)
     movements  = createPrompts(keysTable1, promptGroup1)
     movements2 = createPrompts(keysTable2, promptGroup2)
-    movements3 = createPrompts(keysTable3, promptGroup3)
 end)
 
 local function ctrl(key) return Config.Keybinds[key][2] end
 
--- ─── NUI Callbacks ─────────────────────────────────────────────────────────
+-- ─── DrawText3D helper ────────────────────────────────────────────────────────
+local function DrawText3D(x, y, z, text)
+    local onScreen, screenX, screenY = World3dToScreen2d(x, y, z)
+    if not onScreen then return end
+    SetTextScale(0.35, 0.35)
+    SetTextFont(4)
+    SetTextProportional(1)
+    SetTextColour(255, 255, 255, 215)
+    SetTextEntry('STRING')
+    SetTextCentre(true)
+    AddTextComponentString(text)
+    DrawText(screenX, screenY)
+    local factor = #text / 370
+    DrawRect(screenX, screenY + 0.0125, 0.015 + factor, 0.03, 0, 0, 0, 75)
+end
+
+-- ─── NUI Callbacks ────────────────────────────────────────────────────────────
 RegisterNUICallback('close', function()
     SetNuiFocus(false, false)
     AnimpostfxStop("OJDominoBlur")
@@ -81,7 +87,7 @@ RegisterNUICallback('createIdCard', function(data)
     TriggerServerEvent('fx-idcard:server:buyIdCard', data)
 end)
 
--- ─── Network Events ─────────────────────────────────────────────────────────
+-- ─── Network Events ───────────────────────────────────────────────────────────
 RegisterNetEvent('fx-idcard:client:setData',    function(d) idcardData = d     end)
 RegisterNetEvent('fx-idcard:client:clearData',  function()  idcardData = false end)
 RegisterNetEvent('fx-idcard:client:updateData', function()
@@ -118,7 +124,7 @@ RegisterNetEvent("fx-idcard:client:ShowUi", function(typee, data)
     end
 end)
 
--- ─── Helpers ────────────────────────────────────────────────────────────────
+-- ─── Helpers ──────────────────────────────────────────────────────────────────
 function GetClosestPlayer()
     local myPed    = PlayerPedId()
     local myId     = PlayerId()
@@ -182,7 +188,7 @@ local function exitCamera()
     Config.ShowHud()
 end
 
--- ─── Camera / photo session ─────────────────────────────────────────────────
+-- ─── Camera / photo session ───────────────────────────────────────────────────
 local function takePhoto(v)
     DoScreenFadeOut(1000)
     Wait(1000)
@@ -228,7 +234,7 @@ local function takePhoto(v)
     end)
 end
 
--- ─── Photographer NPC spawn ─────────────────────────────────────────────────
+-- ─── Photographer NPC spawn ───────────────────────────────────────────────────
 local photographerPeds = {}
 
 local function spawnPhotographerPed(key, v)
@@ -241,22 +247,36 @@ local function spawnPhotographerPed(key, v)
     while not HasModelLoaded(hash) do
         Citizen.Wait(10); t = t + 10
         if t > 5000 then
-            if npc.fallback then hash = GetHashKey(npc.fallback); RequestModel(hash) end
+            -- hash failed, try fallback
+            hash = GetHashKey(npc.fallback or "cs_brontesbutler")
+            RequestModel(hash)
+            local t2 = 0
+            while not HasModelLoaded(hash) do
+                Citizen.Wait(10); t2 = t2 + 10
+                if t2 > 3000 then break end
+            end
             break
         end
     end
     local ped = CreatePed(hash, coords.x, coords.y, coords.z - 1, coords.w, false, 0)
+    if not DoesEntityExist(ped) then
+        print("[pac-idcard] ERROR: Failed to create photographer ped for " .. key)
+        return
+    end
     FreezeEntityPosition(ped, true)
-    Citizen.InvokeNative(0x283978A15512B2FE, ped, true)
+    Citizen.InvokeNative(0x283978A15512B2FE, ped, true)  -- SetPedAsNoLongerNeeded equivalent
     SetEntityCanBeDamaged(ped, false)
     SetEntityInvincible(ped, true)
     SetBlockingOfNonTemporaryEvents(ped, true)
+    Citizen.InvokeNative(0xD8B8CFD709214ACD, ped, true)  -- SetPedCanPlayAmbientAnims
     SetModelAsNoLongerNeeded(hash)
     SetEntityAsMissionEntity(ped, true, true)
-    if npc.anim then
-        TaskStartScenarioInPlace(ped, GetHashKey(npc.anim), 0, true, false, false, false)
-    end
+    -- Use WORLD_HUMAN_STAND_MOBILE as fallback standing idle (verified RDR3)
+    -- PROP_HUMAN_STAND_IMPATIENT = arms crossed standing
+    local animHash = GetHashKey(npc.anim or "WORLD_HUMAN_STAND_MOBILE")
+    TaskStartScenarioInPlace(ped, animHash, 0, true, false, false, false)
     photographerPeds[key] = ped
+    print("[pac-idcard] Photographer ped spawned for " .. key .. " handle=" .. ped)
 end
 
 Citizen.CreateThread(function()
@@ -264,7 +284,8 @@ Citizen.CreateThread(function()
         local coords = GetEntityCoords(PlayerPedId())
         for key, v in pairs(Config.Photographers) do
             if v.npc then
-                local dist = #(coords - vector3(v.npc.coords.x, v.npc.coords.y, v.npc.coords.z))
+                local ncoords = v.npc.coords
+                local dist = #(coords - vector3(ncoords.x, ncoords.y, ncoords.z))
                 if dist < Config.PedSpawnDistance and not photographerPeds[key] then
                     spawnPhotographerPed(key, v)
                 elseif dist > Config.PedSpawnDistance + 10 and photographerPeds[key] then
@@ -277,7 +298,7 @@ Citizen.CreateThread(function()
     end
 end)
 
--- ─── Photographer blips ────────────────────────────────────────────────────
+-- ─── Photographer blips ───────────────────────────────────────────────────────
 local function createPhotographerBlip(v)
     local c = v.blips.coords or vector3(v.promptCoords.x, v.promptCoords.y, v.promptCoords.z)
     local blip = N_0x554d9d53f696d002(1664425300, c.x, c.y, c.z)
@@ -297,45 +318,48 @@ Citizen.CreateThread(function()
     end
 end)
 
--- ─── Photographer NPC interaction (talk + print) ───────────────────────────
+-- ─── Photographer NPC interaction ────────────────────────────────────────────
+-- Uses DrawText3D + IsDisabledControlJustPressed instead of prompt hold system.
+-- This is simpler and more reliable than PromptHasHoldModeCompleted for NPC talk.
 --
--- Two-step flow (matches original behaviour):
---   Step 1: Walk up to NPC -> hold E -> enter camera mode
---   Step 2: Take your screenshot, upload to portal, paste URL
---           -> hold Enter near NPC -> print photo (costs $5, adds to inventory)
---
--- promptGroup3 shows BOTH prompts together near the NPC.
--- When in camera mode, promptGroup1 takes over instead.
+-- [E]     -> enter camera mode (take passport photo)
+-- [Enter] -> open print photo UI (paste link -> costs $5 -> adds to inventory)
 Citizen.CreateThread(function()
     while true do
-        local sleep = 500
+        local sleep = 1000
         local myPos = GetEntityCoords(PlayerPedId())
+
         for k, v in pairs(Config.Photographers) do
             local ped = photographerPeds[k]
             if ped and DoesEntityExist(ped) then
-                local dist = #(myPos - GetEntityCoords(ped))
-                if dist < Config.TalkDistance and not cam then
-                    sleep = 1
-                    local label = Locale("promptitle")
-                    if Config.Prices.printphoto then
-                        label = label .. " $" .. Config.Prices.printphoto
-                    end
-                    PromptSetActiveGroupThisFrame(promptGroup3, CreateVarString(10,'LITERAL_STRING', label))
+                local pedPos = GetEntityCoords(ped)
+                local dist   = #(myPos - pedPos)
 
-                    -- [E] hold -> enter camera / photo mode
-                    if PromptHasHoldModeCompleted(movements3[1]) then
+                if dist < Config.TalkDistance and not cam then
+                    sleep = 0  -- run every frame while near
+
+                    -- Draw interaction hint above NPC head
+                    local priceStr = Config.Prices.printphoto and (" $" .. Config.Prices.printphoto) or ""
+                    DrawText3D(pedPos.x, pedPos.y, pedPos.z + 1.2,
+                        "[E] Take Photo" .. priceStr .. "  |  [Enter] Print Photo")
+
+                    -- [E] -> enter camera
+                    if IsDisabledControlJustPressed(0, ctrl("takeidcard")) then
                         Config.HideHud()
                         takePhoto(v)
-                        while cam do Wait(500) end  -- debounce until camera exits
+                        -- debounce: spin until camera is exited
+                        while cam do Wait(500) end
+                        sleep = 1000
 
-                    -- [Enter] hold -> open print photo UI (paste link -> adds to inventory)
-                    elseif PromptHasHoldModeCompleted(movements3[2]) then
+                    -- [Enter] -> open print UI
+                    elseif IsDisabledControlJustPressed(0, ctrl("printphoto")) then
                         SetNuiFocus(true, true)
                         SendNUIMessage({ action = 'print' })
                     end
                 end
             end
         end
+
         Wait(sleep)
     end
 end)
@@ -364,6 +388,7 @@ local function spawnPed(v, coords)
     SetEntityCanBeDamaged(npc, false)
     SetEntityInvincible(npc, true)
     SetBlockingOfNonTemporaryEvents(npc, true)
+    Citizen.InvokeNative(0xD8B8CFD709214ACD, npc, true)  -- SetPedCanPlayAmbientAnims
     SetModelAsNoLongerNeeded(hash)
     SetEntityAsMissionEntity(npc, true, true)
     if v.anims then
@@ -434,14 +459,14 @@ Citizen.CreateThread(function()
     end
 end)
 
--- ─── /idcard command ─────────────────────────────────────────────────────────
+-- ─── /idcard command ──────────────────────────────────────────────────────────
 if Config.TakeCardType == "sql" then
     RegisterCommand(Config.ShowIdcardCommand, function()
         TriggerEvent("fx-idcard:client:showIDCardSQL")
     end)
 end
 
--- ─── Cleanup ────────────────────────────────────────────────────────────────
+-- ─── Cleanup ──────────────────────────────────────────────────────────────────
 AddEventHandler('onResourceStop', function(resourceName)
     if GetCurrentResourceName() ~= resourceName then return end
     for _, v in pairs(Config.Photographers) do

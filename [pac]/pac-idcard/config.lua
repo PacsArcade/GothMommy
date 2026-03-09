@@ -28,10 +28,10 @@ Config.Locale = {
         ["takephoto"]   = "Take Photo  [G]",
         ["printphoto"]  = "Print Photo [Enter]",
         ["exit"]        = "Exit [Backspace]",
-        ["camUp"]       = "Cam Up [\xe2\x86\x91]",
-        ["camDown"]     = "Cam Down [\xe2\x86\x93]",
-        ["camLeft"]     = "Cam Left [\xe2\x86\x90]",
-        ["camRight"]    = "Cam Right [\xe2\x86\x92]",
+        ["camUp"]       = "Cam Up [Up]",
+        ["camDown"]     = "Cam Down [Down]",
+        ["camLeft"]     = "Cam Left [Left]",
+        ["camRight"]    = "Cam Right [Right]",
         ["camForward"]  = "Zoom In [PgUp]",
         ["camBack"]     = "Zoom Out [PgDn]",
         ["filterPrev"]  = "Filter Prev [[",
@@ -80,7 +80,6 @@ Config.ShowDistance            = 1.5
 
 Config.Photographers = {
     ["Blackwater"] = {
-        -- promptCoords kept for blip reference; interaction is now talk-to-NPC
         promptCoords   = vector4(-810.48, -1372.56, 43.02, 104.9485),
         promptDistance = 3.5,
         pedCoords      = vector4(-810.48, -1372.56, 43.02, 285.0),
@@ -90,14 +89,14 @@ Config.Photographers = {
             model    = "mp_re_photography_females_01",
             hash     = 0x5730F05E,
             fallback = "cs_brontesbutler",
-            -- heading flipped 180 degrees: 285 -> 105
-            coords   = vector4(-810.48, -1372.56, 43.02, 105.0),
-            -- Standing idle scenario (not crouching)
-            anim     = "WORLD_HUMAN_STAND_IMPATIENT",
+            -- heading: ~200 faces her toward the door/player coming in
+            coords   = vector4(-810.48, -1372.56, 43.02, 200.0),
+            -- PROP_HUMAN_STAND_IMPATIENT is the verified RDR3 standing idle scenario
+            anim     = "PROP_HUMAN_STAND_IMPATIENT",
         },
         blips = {
             name     = "ID Photo",
-            sprite   = 1364029453,  -- blip_photo_studio
+            sprite   = 1364029453,
             scale    = 0.6,
             modifier = "BLIP_MODIFIER_MP_COLOR_32",
             coords   = vector3(-810.48, -1372.56, 43.02),
@@ -106,7 +105,7 @@ Config.Photographers = {
 }
 
 Config.PedSpawnDistance = 30
-Config.TalkDistance     = 2.5  -- how close to trigger talk prompt on photographer NPC
+Config.TalkDistance     = 2.5
 
 Config.Religious = {
     "Christian", "Buddhist", "Wiccan", "Pagan",
@@ -135,7 +134,7 @@ Config.IDCardNPC = {
             modifier = "BLIP_MODIFIER_MP_COLOR_32",
         },
         anims = {
-            dict = "WORLD_HUMAN_STAND_IMPATIENT",
+            dict = "PROP_HUMAN_STAND_IMPATIENT",
             name = false,
         },
         timeSettings = {
@@ -151,7 +150,7 @@ Config.IDCardNPC = {
         models       = "cs_brontesbutler",
         distance     = 2,
         blips        = false,
-        anims        = { dict = "WORLD_HUMAN_STAND_IMPATIENT", name = false },
+        anims        = { dict = "PROP_HUMAN_STAND_IMPATIENT", name = false },
         timeSettings = false,
     },
 }
@@ -181,7 +180,6 @@ function Locale(key, subs)
         and Config.Locale[Config.Language][key]
         or "[missing: "..key.."]"
     subs = subs or {}
-    -- Simple ${key} substitution — no leading %% required
     for k, v in pairs(subs) do
         translate = translate:gsub('%${' .. k .. '}', tostring(v))
     end
