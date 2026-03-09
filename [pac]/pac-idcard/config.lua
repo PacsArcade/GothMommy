@@ -98,11 +98,13 @@ Config.Photographers = {
             coords   = vector4(-811.50, -1372.80, 44.07, 285.0),
             anim     = "WORLD_HUMAN_SMOKE_NERVOUS_STRESSED",
         },
-        blip = {
+        -- 'blips' key (plural) matches the blip creation loop in client.lua
+        blips = {
             name     = "ID Photo",
             sprite   = -1656531561,
             scale    = 0.6,
             modifier = "BLIP_MODIFIER_MP_COLOR_32",
+            coords   = vector3(-811.50, -1372.80, 44.07),
         },
     },
 }
@@ -115,8 +117,6 @@ Config.Religious = {
 }
 
 -- ─── Camera Filters ────────────────────────────────────────────────────────
--- Applied via CSS filter on the camera preview overlay in the NUI
--- filterNext (.) / filterPrev (,) cycle through these
 Config.CameraFilters = {
     { name = "None",         css = "none" },
     { name = "Sepia",        css = "sepia(1) contrast(1.1)" },
