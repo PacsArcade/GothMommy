@@ -169,6 +169,19 @@ local function moveCam(x, y, z)
     end
 end
 
+-- ─── Camera exit helper — call this from any exit path ─────────────────────
+local function exitCamera()
+    SendNUIMessage({ action = 'showCameraOverlay', visible = false })
+    RenderScriptCams(false, false, 0, true, true)
+    if cam then DestroyCam(cam, true) end
+    cam = nil
+    SetPlayerControl(PlayerId(), true)
+    FreezeEntityPosition(PlayerPedId(), false)
+    SetNuiFocus(false, false)   -- safety: release NUI focus in case it was grabbed
+    TriggerServerEvent('fx-idcard:server:setBucket', 0)
+    Config.ShowHud()
+end
+
 -- ─── Camera / photo session ────────────────────────────────────────────────
 local function takePhoto(v)
     DoScreenFadeOut(1000)
@@ -195,19 +208,14 @@ local function takePhoto(v)
 
     Citizen.CreateThread(function()
         while cam do
-            PromptSetActiveGroupThisFrame(prompts, CreateVarString(10,'LITERAL_STRING',"Photographer"))
+            -- FIX: was 'prompts' (undefined) — must be promptGroup1
+            PromptSetActiveGroupThisFrame(promptGroup1, CreateVarString(10,'LITERAL_STRING',"Photographer"))
             setActivePrompts("camera")
 
-            -- Use controlID [2] for actual input detection
-            if     IsDisabledControlPressed(0, ctrl("exit"))       then
-                SendNUIMessage({ action = 'showCameraOverlay', visible = false })
-                RenderScriptCams(false, false, 0, true, true)
-                DestroyCam(cam, true)
-                cam = nil
-                SetPlayerControl(PlayerId(), true)
-                FreezeEntityPosition(PlayerPedId(), false)
-                TriggerServerEvent('fx-idcard:server:setBucket', 0)
-                Config.ShowHud()
+            if IsDisabledControlPressed(0, ctrl("exit")) then
+                exitCamera()
+                break   -- FIX: exit the loop immediately after cleanup
+
             elseif IsDisabledControlPressed(0, ctrl("camUp"))      then moveCam(0, 0,  0.01)
             elseif IsDisabledControlPressed(0, ctrl("camDown"))    then moveCam(0, 0, -0.01)
             elseif IsDisabledControlPressed(0, ctrl("camLeft"))    then moveCam(0, -0.01, 0)
@@ -381,13 +389,9 @@ AddEventHandler('onResourceStop', function(resourceName)
         if v.npcEntity  then DeletePed(v.npcEntity)   end
         if v.blipEntity then RemoveBlip(v.blipEntity) end
     end
-    if cam then
-        SendNUIMessage({ action = 'showCameraOverlay', visible = false })
-        RenderScriptCams(false, false, 0, true, true)
-        DestroyCam(cam, true)
-        cam = nil
-        SetPlayerControl(PlayerId(), true)
-        FreezeEntityPosition(PlayerPedId(), false)
+    if cam then exitCamera() end
+    if creating then
+        AnimpostfxStop("OJDominoBlur")
+        SetNuiFocus(false, false)
     end
-    if creating then AnimpostfxStop("OJDominoBlur") end
 end)
