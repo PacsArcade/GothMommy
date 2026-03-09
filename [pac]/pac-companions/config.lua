@@ -7,7 +7,7 @@ Config.Locale = "en"
 
 Config.Framework = "vorp" -- VORP for Goth Mommy RP
 
-Config.CallPetKey = false
+Config.CallPetKey = true -- U key to call/load pet
 
 Config.TriggerKeys = {
     OpenShop = 'E',
@@ -54,7 +54,7 @@ Config.Shops = {
         Coords = {
             vector3(-273.51, 689.26, 112.45)
         },
-        Spawndog = vector4(-284.09, 685.34, 113.59, 234.45),
+        Spawndog = vector4(-273.51, 689.26, 112.45, 234.45), -- Fixed: matches shop coords
         Blip = { sprite = -1646261997, x = -273.51, y = 689.26, z = 113.41 }
     }
 }
@@ -62,7 +62,7 @@ Config.Shops = {
 Config.PetAttributes = {
     FollowDistance = 5,
     Invincible = false,
-    SpawnLimiter = 60,
+    SpawnLimiter = 5,   -- Reduced from 60: prevents rapid re-spawn but doesn't block initial purchase
     DeathCooldown = 300
 }
 
