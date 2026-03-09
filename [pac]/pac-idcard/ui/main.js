@@ -4,30 +4,84 @@ $(document).ready(function () {
     $('.printphoto').hide();
     $('.create').hide();
     $('.previewcreate-photo').hide();
+
     var setIllegal   = false;
     var camTarget    = { pcx: 0, pcy: 0, pcz: 0 };
     var cameraActive = false;
     var shootLocked  = false;
 
-    var filterLayer  = document.getElementById('cam-filter-layer');
+    // ─── Lens canvas setup ───────────────────────────────────────────────────
+    // We draw a semi-transparent colour fill on this canvas, then apply
+    // CSS filter to the canvas element ONLY — never to document.body.
+    // This ensures the game scene appears tinted while all HUD elements
+    // (which sit in #camera-overlay with isolation:isolate) stay clean.
+    var lensCanvas  = document.getElementById('lens-canvas');
+    var lensCtx     = lensCanvas.getContext('2d');
+    var acidOverlay = document.getElementById('acid-overlay');
+    var lensRaf     = null;
+    var currentFilterCSS = 'none';
+    var isAcid           = false;
 
-    // ── Filter ────────────────────────────────────────────────────────
-    // Apply to BOTH the tint layer AND document.body so the game scene
-    // (which renders behind the NUI page) appears tinted.
-    // The HUD uses isolation:isolate to prevent inheriting the filter.
-    function setFilter(css, name) {
-        var f = (!css || css === 'none') ? 'none' : css;
-        filterLayer.style.filter    = f;
-        document.body.style.filter  = f;
+    function resizeLens() {
+        lensCanvas.width  = window.innerWidth;
+        lensCanvas.height = window.innerHeight;
+    }
+    resizeLens();
+    window.addEventListener('resize', resizeLens);
+
+    // Draw a very thin dark vignette each frame so the filter has
+    // actual pixels to operate on (pure transparent canvas = no-op).
+    function drawLens() {
+        var w = lensCanvas.width;
+        var h = lensCanvas.height;
+        lensCtx.clearRect(0, 0, w, h);
+
+        // Thin dark vignette edges — subtle, lets game render show through
+        var grad = lensCtx.createRadialGradient(w/2, h/2, h*0.35, w/2, h/2, h*0.75);
+        grad.addColorStop(0,   'rgba(0,0,0,0.00)');
+        grad.addColorStop(1,   'rgba(0,0,0,0.38)');
+        lensCtx.fillStyle = grad;
+        lensCtx.fillRect(0, 0, w, h);
+
+        lensRaf = requestAnimationFrame(drawLens);
+    }
+
+    function startLens() {
+        if (lensRaf) return;
+        lensCanvas.style.display = 'block';
+        drawLens();
+    }
+    function stopLens() {
+        if (lensRaf) { cancelAnimationFrame(lensRaf); lensRaf = null; }
+        lensCanvas.style.display = 'none';
+        lensCanvas.style.filter  = 'none';
+        if (lensCtx) lensCtx.clearRect(0, 0, lensCanvas.width, lensCanvas.height);
+    }
+
+    // ─── Filter application ──────────────────────────────────────────────────
+    // Apply CSS filter to the CANVAS only.  Never touch document.body.
+    function setFilter(css, name, filterType) {
+        currentFilterCSS = (!css || css === 'none') ? 'none' : css;
+        isAcid = (filterType === 'acid');
+
+        // Canvas filter
+        lensCanvas.style.filter = currentFilterCSS;
+
+        // Acid drip overlay
+        if (isAcid) {
+            acidOverlay.style.display = 'block';
+        } else {
+            acidOverlay.style.display = 'none';
+        }
+
         $('#filter-label').text(name || 'None');
     }
 
-    // ── Countdown + flash + screenshot ───────────────────────────────
+    // ─── Countdown + flash + screenshot ─────────────────────────────────────
     function doCountdownAndShoot() {
         if (shootLocked) return;
         shootLocked = true;
 
-        // Hide controls and filter bar during countdown
         $('#cam-controls, #filter-bar').fadeOut(200);
 
         var $cd    = $('#cam-countdown');
@@ -42,15 +96,11 @@ $(document).ready(function () {
                 setTimeout(showNext, 900);
             } else {
                 $cd.hide();
-                // White flash
                 $flash.css({ display:'block', opacity:1 })
                       .animate({ opacity: 0 }, 500, function() { $flash.hide(); });
-                // Tell Lua to capture screenshot
                 $.post('https://' + GetParentResourceName() + '/camShoot', JSON.stringify({}));
-                // Show saved toast bottom-right (above Steam ~80px)
                 $('#cam-saved-toast').stop(true).css({ display:'block', opacity:1 })
                     .delay(2200).fadeOut(600);
-                // Restore controls
                 setTimeout(function() {
                     $('#cam-controls, #filter-bar').fadeIn(300);
                 }, 700);
@@ -60,7 +110,7 @@ $(document).ready(function () {
         showNext();
     }
 
-    // ── Keyboard layout ───────────────────────────────────────────────
+    // ─── Keyboard layout ─────────────────────────────────────────────────────
     var keyMap = {
         'Numpad8':     'up',
         'Numpad2':     'down',
@@ -96,7 +146,7 @@ $(document).ready(function () {
         }));
     });
 
-    // ── ID Card display ───────────────────────────────────────────────
+    // ─── ID Card display ─────────────────────────────────────────────────────
     function setupIDCard(array) {
         if (!array || typeof array !== 'object') return;
         var sex = array.sex === 'Female' ? 'F' : 'M';
@@ -126,7 +176,7 @@ $(document).ready(function () {
             .one('animationend', function() { $(this).hide(); });
     }
 
-    // ── Form submit ───────────────────────────────────────────────────
+    // ─── Form submit ─────────────────────────────────────────────────────────
     $('#submit').click(function () {
         $.post('https://' + GetParentResourceName() + '/createIdCard', JSON.stringify({
             name:      $('#name').val(),
@@ -215,7 +265,7 @@ $(document).ready(function () {
     var ShowPhoto  = false;
     var ShowIdCard = false;
 
-    // ── Message handler ───────────────────────────────────────────────
+    // ─── Message handler ─────────────────────────────────────────────────────
     window.addEventListener('message', function(event) {
         var d = event.data;
         switch (d.action) {
@@ -231,26 +281,29 @@ $(document).ready(function () {
                 CreateIdCardSetData(d.array, d.illegal);
                 $('.create,.previewcreate-photo').fadeIn(500);
                 break;
+
             case 'setFilter':
-                setFilter(d.css, d.name);
+                setFilter(d.css, d.name, d.filterType);
                 break;
+
             case 'showCameraOverlay':
                 if (d.visible) {
                     camTarget    = { pcx: d.pcx||0, pcy: d.pcy||0, pcz: d.pcz||0 };
                     cameraActive = true;
                     shootLocked  = false;
-                    filterLayer.style.filter   = 'none';
-                    document.body.style.filter = 'none';
+                    // Reset filter state
+                    lensCanvas.style.filter = 'none';
+                    acidOverlay.style.display = 'none';
                     $('#filter-label').text('None');
-                    filterLayer.style.display  = 'block';
+                    // Start the lens canvas render loop
+                    startLens();
                     $('#cam-controls, #filter-bar').show();
                     $('#camera-overlay').show();
                 } else {
                     cameraActive = false;
+                    stopLens();
+                    acidOverlay.style.display = 'none';
                     $('#camera-overlay').hide();
-                    filterLayer.style.display  = 'none';
-                    filterLayer.style.filter   = 'none';
-                    document.body.style.filter = 'none';
                     $('#filter-label').text('');
                     $('#cam-countdown').hide();
                     $('#cam-saved-toast').stop(true).hide();

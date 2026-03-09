@@ -1,440 +1,509 @@
 <!DOCTYPE html>
 <html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Goth Mommy RP ID Card</title>
-        <link rel="stylesheet" href="/ui/style.css">
-        <script type="module" src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.esm.js"></script>
-        <script nomodule src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.js"></script>
-        <script src="https://code.iconify.design/iconify-icon/1.0.7/iconify-icon.min.js"></script>
-        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
-        <script src="https://code.jquery.com/jquery-3.6.4.min.js"></script>
-        <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
-        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
-        <style>
-            * { box-sizing: border-box; margin: 0; padding: 0; }
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Goth Mommy RP ID Card</title>
+    <link rel="stylesheet" href="/ui/style.css">
+    <script type="module" src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.esm.js"></script>
+    <script nomodule src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.js"></script>
+    <script src="https://code.iconify.design/iconify-icon/1.0.7/iconify-icon.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+    <script src="https://code.jquery.com/jquery-3.6.4.min.js"></script>
+    <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
 
-            /* Form theme */
-            .create { background: rgba(10,6,2,0.92) !important; color: #e8d8b0 !important; }
-            .create .label, .create span { color: #c8a96e !important; }
-            .create input, .create select {
-                background: rgba(30,18,5,0.85) !important;
-                color: #f0e0b0 !important;
-                border-color: #6b4c20 !important;
-            }
-            .create select option { background: #1a0e03; color: #f0e0b0; }
-            .create h1, .create h2 { color: #d4a843 !important; }
-            .name-cont { display:flex; flex-direction:column; gap:6px; }
-            .name-cont .label { margin-bottom:2px; }
-            .name-cont input#name { margin-top:4px; }
+        /* ── Form theme ── */
+        .create { background: rgba(10,6,2,0.92) !important; color: #e8d8b0 !important; }
+        .create .label, .create span { color: #c8a96e !important; }
+        .create input, .create select {
+            background: rgba(30,18,5,0.85) !important;
+            color: #f0e0b0 !important;
+            border-color: #6b4c20 !important;
+        }
+        .create select option { background: #1a0e03; color: #f0e0b0; }
+        .create h1, .create h2 { color: #d4a843 !important; }
+        .name-cont { display:flex; flex-direction:column; gap:6px; }
+        .name-cont .label { margin-bottom:2px; }
+        .name-cont input#name { margin-top:4px; }
 
-            /* ═══════════════════════════════════════
-               CAMERA SYSTEM — layer order:
-                 9980  #cam-filter-layer  (scene tint)
-                 9999  #camera-overlay   (HUD — isolated)
-                10000  #cam-flash        (shutter white-out)
-                10001  #cam-saved-toast  (bottom-right)
-               isolation:isolate on overlay + panel
-               prevents filter bleed into HUD text.
-            ═══════════════════════════════════════ */
+        /*
+         * ═══════════════════════════════════════════════════════
+         *  CAMERA SYSTEM  —  layer stack (z-index)
+         *
+         *   9970  #lens-canvas        SVG-filtered canvas (scene tint)
+         *                             This is the ONLY thing that gets
+         *                             a CSS/SVG filter applied.
+         *
+         *   9980  #acid-overlay       Extra drip layer for Acid Trip only
+         *
+         *   9999  #camera-overlay     HUD panel — NO filter ever touches
+         *                             this element or its children.
+         *                             isolation:isolate as belt+suspenders.
+         *
+         *  10000  #cam-flash          Shutter white-out
+         *  10001  #cam-saved-toast    Bottom-right toast
+         *
+         *  How the lens filter works:
+         *   • #lens-canvas is a full-screen <canvas> element.
+         *   • We draw a solid colour fill each frame (or a gradient).
+         *   • A CSS filter (sepia, hue-rotate, etc.) is applied to the
+         *     canvas element itself — NOT to document.body.
+         *   • Because the canvas is behind the HUD overlay and the HUD
+         *     uses isolation:isolate, the filter is 100% contained.
+         *   • The RDR3 game render sits behind the entire NUI page, so
+         *     the canvas colour tint blends with the game image.
+         * ═══════════════════════════════════════════════════════
+         */
 
-            #cam-filter-layer {
-                display: none;
-                position: fixed;
-                inset: 0;
-                pointer-events: none;
-                z-index: 9980;
-                background: rgba(0,0,0,0.01);
-                transition: filter 0.25s ease;
-                /* DO NOT put isolation here — it must tint the scene */
-            }
+        /* Lens tint canvas */
+        #lens-canvas {
+            display: none;
+            position: fixed;
+            inset: 0;
+            width: 100vw;
+            height: 100vh;
+            pointer-events: none;
+            z-index: 9970;
+            transition: filter 0.3s ease;
+        }
 
-            #camera-overlay {
-                display: none;
-                position: fixed;
-                inset: 0;
-                pointer-events: none;
-                z-index: 9999;
-                /* isolation breaks filter inheritance from layer below */
-                isolation: isolate;
-            }
+        /* Acid drip overlay (only visible on Acid Trip) */
+        #acid-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 9980;
+            /* SVG filter defined inline below */
+            filter: url(#acid-filter);
+            background: transparent;
+            /* animated wave via clip-path */
+            animation: acidDrip 1.4s ease-in-out infinite alternate;
+        }
+        @keyframes acidDrip {
+            0%   { opacity: 0.18; filter: url(#acid-filter) hue-rotate(0deg);   }
+            50%  { opacity: 0.28; filter: url(#acid-filter) hue-rotate(60deg);  }
+            100% { opacity: 0.22; filter: url(#acid-filter) hue-rotate(120deg); }
+        }
 
-            /* ── Filter bar (bottom centre) ── */
-            #filter-bar {
-                position: absolute;
-                bottom: 44px;
-                left: 50%;
-                transform: translateX(-50%);
-                display: flex;
-                align-items: center;
-                gap: 18px;
-                background: rgba(10,6,2,0.82);
-                border: 1px solid #8b6914;
-                border-radius: 5px;
-                padding: 8px 24px;
-                pointer-events: none;
-            }
-            .filter-key {
-                font-family: 'Georgia', serif;
-                font-size: 15px;
-                color: #c8a96e;
-                background: rgba(20,12,2,0.90);
-                border: 1px solid #8b6914;
-                border-radius: 3px;
-                padding: 3px 10px;
-                letter-spacing: 1px;
-            }
-            #filter-label {
-                font-family: 'Georgia', serif;
-                font-size: 20px;
-                color: #f0e0b0;
-                letter-spacing: 3px;
-                text-shadow: 1px 1px 8px #000;
-                min-width: 150px;
-                text-align: center;
-            }
+        /* HUD wrapper — isolation breaks any accidental filter bleed */
+        #camera-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 9999;
+            isolation: isolate;
+        }
 
-            /* ── Controls panel (right side) — numpad grid ── */
-            #cam-controls {
-                position: absolute;
-                top: 50%;
-                right: 32px;
-                transform: translateY(-50%);
-                pointer-events: none;
-                /* shaded box */
-                background: rgba(10,6,2,0.82);
-                border: 1px solid #8b6914;
-                border-radius: 6px;
-                padding: 18px 22px 16px;
-                width: 260px;
-            }
+        /* ── Filter bar (bottom centre) ── */
+        #filter-bar {
+            position: absolute;
+            bottom: 44px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            align-items: center;
+            gap: 18px;
+            background: rgba(10,6,2,0.82);
+            border: 1px solid #8b6914;
+            border-radius: 5px;
+            padding: 8px 24px;
+            pointer-events: none;
+            isolation: isolate;
+        }
+        .filter-key {
+            font-family: 'Georgia', serif;
+            font-size: 15px;
+            color: #c8a96e;
+            background: rgba(20,12,2,0.90);
+            border: 1px solid #8b6914;
+            border-radius: 3px;
+            padding: 3px 10px;
+            letter-spacing: 1px;
+        }
+        #filter-label {
+            font-family: 'Georgia', serif;
+            font-size: 20px;
+            color: #f0e0b0;
+            letter-spacing: 3px;
+            text-shadow: 1px 1px 8px #000;
+            min-width: 150px;
+            text-align: center;
+        }
 
-            /* Title */
-            .cam-ctrl-title {
-                font-family: 'Georgia', serif;
-                font-size: 20px;
-                font-weight: bold;
-                color: #d4a843;
-                text-align: center;
-                letter-spacing: 4px;
-                text-transform: uppercase;
-                text-shadow: 0 0 10px rgba(212,168,67,0.6);
-                margin-bottom: 14px;
-                padding-bottom: 10px;
-                border-bottom: 1px solid rgba(139,105,20,0.5);
-            }
+        /* ── Controls panel (right side, numpad grid) ── */
+        #cam-controls {
+            position: absolute;
+            top: 50%;
+            right: 32px;
+            transform: translateY(-50%);
+            pointer-events: none;
+            isolation: isolate;
+            background: rgba(10,6,2,0.82);
+            border: 1px solid #8b6914;
+            border-radius: 6px;
+            padding: 18px 22px 16px;
+            width: 260px;
+        }
 
-            /* Top action row: Take Photo + Exit side by side */
-            .cam-action-row {
-                display: flex;
-                justify-content: space-between;
-                gap: 10px;
-                margin-bottom: 14px;
-            }
-            .cam-action-cell {
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                gap: 5px;
-                flex: 1;
-            }
+        .cam-ctrl-title {
+            font-family: 'Georgia', serif;
+            font-size: 22px;
+            font-weight: bold;
+            color: #d4a843;
+            text-align: center;
+            letter-spacing: 5px;
+            text-transform: uppercase;
+            text-shadow: 0 0 14px rgba(212,168,67,0.7);
+            margin-bottom: 14px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid rgba(139,105,20,0.5);
+        }
 
-            .cam-ctrl-divider {
-                height: 1px;
-                background: rgba(139,105,20,0.40);
-                margin: 10px 0;
-            }
+        /* Top row: Take Photo | Exit */
+        .cam-action-row {
+            display: flex;
+            justify-content: center;
+            gap: 14px;
+            margin-bottom: 14px;
+        }
+        .cam-action-cell {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 5px;
+            flex: 1;
+        }
 
-            /* Numpad 3x3 grid */
-            .cam-numpad {
-                display: grid;
-                grid-template-columns: repeat(3, 1fr);
-                gap: 8px;
-            }
-            .cam-numpad-cell {
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                gap: 5px;
-            }
+        .cam-ctrl-divider {
+            height: 1px;
+            background: rgba(139,105,20,0.40);
+            margin: 10px 0;
+        }
 
-            /* Shared key style */
-            .cam-key {
-                font-family: 'Georgia', serif;
-                font-size: 13px;
-                color: #f0e0b0;
-                background: rgba(20,12,2,0.92);
-                border: 1px solid #8b6914;
-                border-radius: 4px;
-                padding: 6px 0;
-                width: 100%;
-                text-align: center;
-                letter-spacing: 1px;
-                box-shadow: 0 2px 6px rgba(0,0,0,0.6),
-                            inset 0 1px 0 rgba(212,168,67,0.15);
-            }
-            .cam-action-cell .cam-key {
-                font-size: 14px;
-                padding: 7px 0;
-            }
+        /* Numpad 3×3 grid — centred */
+        .cam-numpad {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            justify-items: center;
+        }
+        .cam-numpad-cell {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 5px;
+            width: 100%;
+        }
 
-            /* Label below each key */
-            .cam-key-label {
-                font-family: 'Georgia', serif;
-                font-size: 11px;
-                color: #c8a96e;
-                text-transform: uppercase;
-                letter-spacing: 1px;
-                text-align: center;
-                line-height: 1.2;
-            }
-            .cam-action-cell .cam-key-label {
-                font-size: 12px;
-            }
+        /* Shared key style */
+        .cam-key {
+            font-family: 'Georgia', serif;
+            font-size: 13px;
+            color: #f0e0b0;
+            background: rgba(20,12,2,0.92);
+            border: 1px solid #8b6914;
+            border-radius: 4px;
+            padding: 7px 0;
+            width: 100%;
+            text-align: center;
+            letter-spacing: 1px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.6),
+                        inset 0 1px 0 rgba(212,168,67,0.15);
+        }
+        .cam-action-cell .cam-key {
+            font-size: 14px;
+            padding: 8px 0;
+        }
 
-            /* ── Countdown ── */
-            #cam-countdown {
-                display: none;
-                position: absolute;
-                top: 50%;
-                left: 50%;
-                transform: translate(-50%,-50%);
-                font-family: 'Georgia', serif;
-                font-size: 140px;
-                color: #f0e0b0;
-                text-shadow: 0 0 60px rgba(212,168,67,0.8), 2px 2px 10px #000;
-                pointer-events: none;
-                background: rgba(10,6,2,0.55);
-                border: 2px solid rgba(139,105,20,0.7);
-                border-radius: 8px;
-                padding: 10px 40px;
-            }
+        /* Label below each key */
+        .cam-key-label {
+            font-family: 'Georgia', serif;
+            font-size: 11px;
+            color: #c8a96e;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            text-align: center;
+            line-height: 1.2;
+        }
+        .cam-action-cell .cam-key-label {
+            font-size: 12px;
+        }
 
-            /* ── Photo saved toast (bottom-right, above Steam) ── */
-            #cam-saved-toast {
-                display: none;
-                position: fixed;
-                bottom: 80px;
-                right: 24px;
-                background: rgba(10,6,2,0.88);
-                border: 1px solid #8b6914;
-                border-radius: 5px;
-                padding: 10px 20px;
-                font-family: 'Georgia', serif;
-                font-size: 15px;
-                color: #f0e0b0;
-                letter-spacing: 1px;
-                text-shadow: 1px 1px 4px #000;
-                z-index: 10001;
-                pointer-events: none;
-                isolation: isolate;
-            }
+        /* ── Countdown ── */
+        #cam-countdown {
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%,-50%);
+            font-family: 'Georgia', serif;
+            font-size: 140px;
+            color: #f0e0b0;
+            text-shadow: 0 0 60px rgba(212,168,67,0.8), 2px 2px 10px #000;
+            pointer-events: none;
+            background: rgba(10,6,2,0.55);
+            border: 2px solid rgba(139,105,20,0.7);
+            border-radius: 8px;
+            padding: 10px 40px;
+            isolation: isolate;
+        }
 
-            /* ── Camera flash ── */
-            #cam-flash {
-                display: none;
-                position: fixed;
-                inset: 0;
-                background: #fff;
-                z-index: 10000;
-                pointer-events: none;
-                opacity: 0;
-            }
-        </style>
-    </head>
+        /* ── Photo saved toast ── */
+        #cam-saved-toast {
+            display: none;
+            position: fixed;
+            bottom: 80px;
+            right: 24px;
+            background: rgba(10,6,2,0.88);
+            border: 1px solid #8b6914;
+            border-radius: 5px;
+            padding: 10px 20px;
+            font-family: 'Georgia', serif;
+            font-size: 15px;
+            color: #f0e0b0;
+            letter-spacing: 1px;
+            text-shadow: 1px 1px 4px #000;
+            z-index: 10001;
+            pointer-events: none;
+            isolation: isolate;
+        }
+
+        /* ── Camera flash ── */
+        #cam-flash {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: #fff;
+            z-index: 10000;
+            pointer-events: none;
+            opacity: 0;
+        }
+    </style>
+</head>
 <body>
 
-    <!-- Scene tint (filter applied here, behind HUD) -->
-    <div id="cam-filter-layer"></div>
+<!-- ═══════════════════════════════════════════════════
+     SVG filter definitions (hidden, referenced by id)
+     acid-filter: feTurbulence ripple + feDisplacementMap
+═══════════════════════════════════════════════════ -->
+<svg style="position:absolute;width:0;height:0;overflow:hidden" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <filter id="acid-filter" x="0%" y="0%" width="100%" height="100%" color-interpolation-filters="sRGB">
+      <!-- Animated turbulence for the drip/wave warp -->
+      <feTurbulence type="fractalNoise" baseFrequency="0.012 0.04" numOctaves="3" seed="2" result="noise">
+        <animate attributeName="baseFrequency"
+                 values="0.012 0.04; 0.018 0.07; 0.012 0.04"
+                 dur="1.6s" repeatCount="indefinite"/>
+        <animate attributeName="seed"
+                 values="2;5;8;2"
+                 dur="3.2s" repeatCount="indefinite"/>
+      </feTurbulence>
+      <!-- Displacement: pulls pixels along the noise field -->
+      <feDisplacementMap in="SourceGraphic" in2="noise"
+                         scale="28" xChannelSelector="R" yChannelSelector="G"
+                         result="warped"/>
+      <!-- Saturate + hue-rotate for the psychedelic colour shift -->
+      <feColorMatrix type="saturate" values="6" in="warped" result="sat"/>
+      <feColorMatrix type="hueRotate" values="0" in="sat" result="hued">
+        <animate attributeName="values"
+                 values="0;90;180;270;360"
+                 dur="2s" repeatCount="indefinite"/>
+      </feColorMatrix>
+    </filter>
+  </defs>
+</svg>
 
-    <!-- Camera flash -->
-    <div id="cam-flash"></div>
+<!-- Lens tint canvas — CSS filter applied HERE ONLY -->
+<canvas id="lens-canvas"></canvas>
 
-    <!-- Photo saved toast (outside overlay so filter never touches it) -->
-    <div id="cam-saved-toast">&#128247; Photo Saved</div>
+<!-- Acid drip overlay (only shown for Acid Trip filter) -->
+<div id="acid-overlay"></div>
 
-    <!-- Camera HUD (isolation:isolate keeps filter from bleeding in) -->
-    <div id="camera-overlay">
+<!-- Camera flash -->
+<div id="cam-flash"></div>
 
-        <!-- Countdown -->
-        <div id="cam-countdown"></div>
+<!-- Photo saved toast -->
+<div id="cam-saved-toast">&#128247; Photo Saved</div>
 
-        <!-- Filter bar bottom-centre -->
-        <div id="filter-bar">
-            <span class="filter-key">NUM 1</span>
-            <span id="filter-label">None</span>
-            <span class="filter-key">NUM 3</span>
-        </div>
+<!-- Camera HUD (isolation:isolate, no filter ever touches this) -->
+<div id="camera-overlay">
 
-        <!-- Controls panel right side -->
-        <div id="cam-controls">
+    <div id="cam-countdown"></div>
 
-            <!-- Title -->
-            <div class="cam-ctrl-title">Photographer</div>
+    <!-- Filter bar bottom-centre -->
+    <div id="filter-bar">
+        <span class="filter-key">NUM 1</span>
+        <span id="filter-label">None</span>
+        <span class="filter-key">NUM 3</span>
+    </div>
 
-            <!-- Top row: Take Photo | Exit -->
-            <div class="cam-action-row">
-                <div class="cam-action-cell">
-                    <div class="cam-key">ENTER</div>
-                    <div class="cam-key-label">Take Photo</div>
-                </div>
-                <div class="cam-action-cell">
-                    <div class="cam-key">NUM 0</div>
-                    <div class="cam-key-label">Exit</div>
-                </div>
+    <!-- Controls panel -->
+    <div id="cam-controls">
+        <div class="cam-ctrl-title">Photographer</div>
+
+        <!-- Take Photo + Exit at top -->
+        <div class="cam-action-row">
+            <div class="cam-action-cell">
+                <div class="cam-key">ENTER</div>
+                <div class="cam-key-label">Take Photo</div>
             </div>
-
-            <div class="cam-ctrl-divider"></div>
-
-            <!-- Numpad 3×3 grid
-                 Row 1:  7=Zoom In   8=Cam Up    9=Zoom Out
-                 Row 2:  4=Cam Left  5=Reset     6=Cam Right
-                 Row 3:  1=Flt Prev  2=Cam Down  3=Flt Next
-            -->
-            <div class="cam-numpad">
-                <!-- Row 1 -->
-                <div class="cam-numpad-cell">
-                    <div class="cam-key">NUM 7</div>
-                    <div class="cam-key-label">Zoom In</div>
-                </div>
-                <div class="cam-numpad-cell">
-                    <div class="cam-key">NUM 8</div>
-                    <div class="cam-key-label">Cam Up</div>
-                </div>
-                <div class="cam-numpad-cell">
-                    <div class="cam-key">NUM 9</div>
-                    <div class="cam-key-label">Zoom Out</div>
-                </div>
-                <!-- Row 2 -->
-                <div class="cam-numpad-cell">
-                    <div class="cam-key">NUM 4</div>
-                    <div class="cam-key-label">Cam Left</div>
-                </div>
-                <div class="cam-numpad-cell">
-                    <div class="cam-key">NUM 5</div>
-                    <div class="cam-key-label">Reset</div>
-                </div>
-                <div class="cam-numpad-cell">
-                    <div class="cam-key">NUM 6</div>
-                    <div class="cam-key-label">Cam Right</div>
-                </div>
-                <!-- Row 3 -->
-                <div class="cam-numpad-cell">
-                    <div class="cam-key">NUM 1</div>
-                    <div class="cam-key-label">Flt Prev</div>
-                </div>
-                <div class="cam-numpad-cell">
-                    <div class="cam-key">NUM 2</div>
-                    <div class="cam-key-label">Cam Down</div>
-                </div>
-                <div class="cam-numpad-cell">
-                    <div class="cam-key">NUM 3</div>
-                    <div class="cam-key-label">Flt Next</div>
-                </div>
+            <div class="cam-action-cell">
+                <div class="cam-key">NUM 0</div>
+                <div class="cam-key-label">Exit</div>
             </div>
+        </div>
 
-        </div>
-    </div>
+        <div class="cam-ctrl-divider"></div>
 
-    <div class="previewcreate-photo">
-        <img id="previewphoto" src="/ui/assets/printphoto.png" alt="">
-        <img id="preview-frame" src="/ui/assets/preview-frame.png" alt="">
+        <!-- Numpad 3×3 -->
+        <div class="cam-numpad">
+            <!-- Row 1: 7 8 9 -->
+            <div class="cam-numpad-cell">
+                <div class="cam-key">NUM 7</div>
+                <div class="cam-key-label">Zoom In</div>
+            </div>
+            <div class="cam-numpad-cell">
+                <div class="cam-key">NUM 8</div>
+                <div class="cam-key-label">Cam Up</div>
+            </div>
+            <div class="cam-numpad-cell">
+                <div class="cam-key">NUM 9</div>
+                <div class="cam-key-label">Zoom Out</div>
+            </div>
+            <!-- Row 2: 4 5 6 -->
+            <div class="cam-numpad-cell">
+                <div class="cam-key">NUM 4</div>
+                <div class="cam-key-label">Cam Left</div>
+            </div>
+            <div class="cam-numpad-cell">
+                <div class="cam-key">NUM 5</div>
+                <div class="cam-key-label">Reset</div>
+            </div>
+            <div class="cam-numpad-cell">
+                <div class="cam-key">NUM 6</div>
+                <div class="cam-key-label">Cam Right</div>
+            </div>
+            <!-- Row 3: 1 2 3 -->
+            <div class="cam-numpad-cell">
+                <div class="cam-key">NUM 1</div>
+                <div class="cam-key-label">Flt Prev</div>
+            </div>
+            <div class="cam-numpad-cell">
+                <div class="cam-key">NUM 2</div>
+                <div class="cam-key-label">Cam Down</div>
+            </div>
+            <div class="cam-numpad-cell">
+                <div class="cam-key">NUM 3</div>
+                <div class="cam-key-label">Flt Next</div>
+            </div>
+        </div>
     </div>
-    <div class="create">
-        <button class="close-create"></button>
-        <h1>ID CARD</h1>
-        <h2>To create an ID card, fill in the following information</h2>
-        <img id="usaflag" src="/ui/assets/flag1899.png" alt="">
-        <div class="name-cont">
-            <span class="label">NAME / SURNAME</span>
-            <input type="text" id="name" value="Louis Cunningham">
-            <div class="line"></div>
-        </div>
-        <div class="city-cont">
-            <span class="label">City of Birth / Religion</span>
-            <img id="cityicon" src="/ui/assets/city.png" alt="">
-            <select id="cityname">
-                <option>Blackwater</option><option>Valentine</option><option>Rhodes</option>
-                <option>Saint Denis</option><option>Strawberry</option><option>Annesburg</option>
-                <option>Van Horn</option><option>Emerald Ranch</option><option>Armadillo</option>
-                <option>Tumbleweed</option><option>Other</option>
-            </select>
-            <img id="religiousicon" src="/ui/assets/cross.png" alt="">
-            <select id="religious">
-                <option value="">-- Select --</option>
-                <option>Christian</option><option>Buddhist</option><option>Wiccan</option>
-                <option>Pagan</option><option>Spiritualist</option><option>Coven</option>
-                <option>Jewish</option><option>Muslim</option><option>Atheist</option><option>None</option>
-            </select>
-            <div class="line"></div>
-        </div>
-        <div class="sex-cont">
-            <span class="label">Sex</span>
-            <span class="mantext">Man:</span><input type="checkbox" id="sex-man" disabled>
-            <span class="womantext">Woman:</span><input type="checkbox" id="sex-women" disabled>
-            <div class="line"></div>
-        </div>
-        <div class="age-cont">
-            <span class="label">Date of Birth</span>
-            <span class="height-label">Age:</span>
-            <input type="text" id="ageinput" value="29" disabled>
-            <input type="date" id="dateinput" min="1820-01-01" max="1899-12-31">
-            <div class="line"></div>
-        </div>
-        <div class="body-cont">
-            <span class="label">Height / Weight</span>
-            <span class="age-label">Height:</span>
-            <input type="text" id="heightinput" value="5'1" disabled>
-            <div class="height-tick"></div>
-            <span class="weight-label">Weight:</span>
-            <input type="text" id="weightinput" value="80kg">
-            <div class="line"></div>
-        </div>
-        <div class="hair-cont">
-            <span class="label">Hair / Eyes Color</span>
-            <img id="hairicon" src="/ui/assets/hairicon.png" alt="">
-            <select id="hair">
-                <option>Black</option><option>Dark Brown</option><option>Brown</option>
-                <option>Auburn</option><option>Red</option><option>Strawberry Blonde</option>
-                <option>Blonde</option><option>Dirty Blonde</option><option>Light Blonde</option>
-                <option>Grey</option><option>White</option><option>Bald</option>
-            </select>
-            <img id="eyeicon" src="/ui/assets/eyeicon.png" alt="">
-            <select id="eye">
-                <option>Brown</option><option>Dark Brown</option><option>Hazel</option>
-                <option>Green</option><option>Blue</option><option>Light Blue</option>
-                <option>Grey</option><option>Amber</option><option>Black</option>
-            </select>
-            <div class="line"></div>
-        </div>
-        <button id="submit" type="button">SUBMIT</button>
+</div>
+
+<div class="previewcreate-photo">
+    <img id="previewphoto" src="/ui/assets/printphoto.png" alt="">
+    <img id="preview-frame" src="/ui/assets/preview-frame.png" alt="">
+</div>
+<div class="create">
+    <button class="close-create"></button>
+    <h1>ID CARD</h1>
+    <h2>To create an ID card, fill in the following information</h2>
+    <img id="usaflag" src="/ui/assets/flag1899.png" alt="">
+    <div class="name-cont">
+        <span class="label">NAME / SURNAME</span>
+        <input type="text" id="name" value="Louis Cunningham">
+        <div class="line"></div>
     </div>
-    <div class="printphoto">
-        <img class="photo" src="https://i.hizliresim.com/950uitk.png" alt="">
-        <div class="photo-frame"></div>
-        <input type="text" name="link" id="link" placeholder="https://pacsarcade.org/idphotos/">
-        <button class="preview">PREVIEW</button>
-        <button class="print">PRINT</button>
-        <button class="close"></button>
+    <div class="city-cont">
+        <span class="label">City of Birth / Religion</span>
+        <img id="cityicon" src="/ui/assets/city.png" alt="">
+        <select id="cityname">
+            <option>Blackwater</option><option>Valentine</option><option>Rhodes</option>
+            <option>Saint Denis</option><option>Strawberry</option><option>Annesburg</option>
+            <option>Van Horn</option><option>Emerald Ranch</option><option>Armadillo</option>
+            <option>Tumbleweed</option><option>Other</option>
+        </select>
+        <img id="religiousicon" src="/ui/assets/cross.png" alt="">
+        <select id="religious">
+            <option value="">-- Select --</option>
+            <option>Christian</option><option>Buddhist</option><option>Wiccan</option>
+            <option>Pagan</option><option>Spiritualist</option><option>Coven</option>
+            <option>Jewish</option><option>Muslim</option><option>Atheist</option><option>None</option>
+        </select>
+        <div class="line"></div>
     </div>
-    <div class="photograph">
-        <img class="photo" src="https://i.hizliresim.com/950uitk.png" alt="">
-        <div class="photo-frame"></div>
+    <div class="sex-cont">
+        <span class="label">Sex</span>
+        <span class="mantext">Man:</span><input type="checkbox" id="sex-man" disabled>
+        <span class="womantext">Woman:</span><input type="checkbox" id="sex-women" disabled>
+        <div class="line"></div>
     </div>
-    <div class="id-card">
-        <img class="playerimg" src="https://i.hizliresim.com/950uitk.png" alt="">
-        <img class="frame" src="/ui/assets/frame.png" alt="">
-        <span class="charid">NODATA</span><span class="sex">NODATA</span>
-        <span class="hair">NODATA</span><span class="eyes">NODATA</span>
-        <span class="height">NODATA</span><span class="weight">NODATA</span>
-        <span class="religious">NODATA</span><span class="dateofbirth">NODATA</span>
-        <span class="age">NODATA</span><span class="license">NODATA</span>
-        <span class="name">NODATA</span>
-        <div class="server-logo"></div>
-        <div class="country">Goth Mommy RP</div>
-        <div class="card-zone">NODATA</div>
+    <div class="age-cont">
+        <span class="label">Date of Birth</span>
+        <span class="height-label">Age:</span>
+        <input type="text" id="ageinput" value="29" disabled>
+        <input type="date" id="dateinput" min="1820-01-01" max="1899-12-31">
+        <div class="line"></div>
     </div>
-</body>
+    <div class="body-cont">
+        <span class="label">Height / Weight</span>
+        <span class="age-label">Height:</span>
+        <input type="text" id="heightinput" value="5'1" disabled>
+        <div class="height-tick"></div>
+        <span class="weight-label">Weight:</span>
+        <input type="text" id="weightinput" value="80kg">
+        <div class="line"></div>
+    </div>
+    <div class="hair-cont">
+        <span class="label">Hair / Eyes Color</span>
+        <img id="hairicon" src="/ui/assets/hairicon.png" alt="">
+        <select id="hair">
+            <option>Black</option><option>Dark Brown</option><option>Brown</option>
+            <option>Auburn</option><option>Red</option><option>Strawberry Blonde</option>
+            <option>Blonde</option><option>Dirty Blonde</option><option>Light Blonde</option>
+            <option>Grey</option><option>White</option><option>Bald</option>
+        </select>
+        <img id="eyeicon" src="/ui/assets/eyeicon.png" alt="">
+        <select id="eye">
+            <option>Brown</option><option>Dark Brown</option><option>Hazel</option>
+            <option>Green</option><option>Blue</option><option>Light Blue</option>
+            <option>Grey</option><option>Amber</option><option>Black</option>
+        </select>
+        <div class="line"></div>
+    </div>
+    <button id="submit" type="button">SUBMIT</button>
+</div>
+<div class="printphoto">
+    <img class="photo" src="https://i.hizliresim.com/950uitk.png" alt="">
+    <div class="photo-frame"></div>
+    <input type="text" name="link" id="link" placeholder="https://pacsarcade.org/idphotos/">
+    <button class="preview">PREVIEW</button>
+    <button class="print">PRINT</button>
+    <button class="close"></button>
+</div>
+<div class="photograph">
+    <img class="photo" src="https://i.hizliresim.com/950uitk.png" alt="">
+    <div class="photo-frame"></div>
+</div>
+<div class="id-card">
+    <img class="playerimg" src="https://i.hizliresim.com/950uitk.png" alt="">
+    <img class="frame" src="/ui/assets/frame.png" alt="">
+    <span class="charid">NODATA</span><span class="sex">NODATA</span>
+    <span class="hair">NODATA</span><span class="eyes">NODATA</span>
+    <span class="height">NODATA</span><span class="weight">NODATA</span>
+    <span class="religious">NODATA</span><span class="dateofbirth">NODATA</span>
+    <span class="age">NODATA</span><span class="license">NODATA</span>
+    <span class="name">NODATA</span>
+    <div class="server-logo"></div>
+    <div class="country">Goth Mommy RP</div>
+    <div class="card-zone">NODATA</div>
+</div>
+
 <script src="/ui/main.js" type="text/javascript"></script>
+</body>
 </html>

@@ -60,8 +60,8 @@ Config.HideHud = function() end
 Config.ShowHud = function() end
 
 Config.Prices = {
-    printphoto = 0,    -- FREE to enter the photo booth
-    idcard     = 5,    -- $5 to develop the film
+    printphoto = 0,
+    idcard     = 5,
     illegal    = 100,
 }
 
@@ -75,25 +75,10 @@ Config.ManIdCardItem           = "man_idcard"
 Config.WomanIdCardItem         = "woman_idcard"
 Config.ShowDistance            = 1.5
 
---[[
-  NAVMESH +1 RULE: Both CreatePed AND SetEntityCoords snap +1 in this building.
-  Config z must be 1 unit below desired floor z.
-
-  Player desired floor z ~44.278  ->  config pedCoords.z = 43.228
-  NPC    desired floor z ~44.073  ->  config npc.coords.z = 43.073
-
-  RDR heading: 0=North  90=West  180=South  270=East
-  Camera sits at higher X (~-812). Player at lower X (~-815).
-  Player heading=270 (East) faces AWAY from camera = back to camera.
-  Player heading=90  (West) faces TOWARD camera.
-  ** pedCoords.w = 270 was correct visually per earlier tests **
-  ** Reverted to 270 per player request - do not flip again    **
-]]
 Config.Photographers = {
     ["Blackwater"] = {
         promptCoords   = vector4(-812.00, -1373.50, 44.07, 180.0),
         promptDistance = 3.5,
-        -- heading 270 confirmed correct visually (player faces camera)
         pedCoords = vector4(-814.981, -1375.036, 43.228, 270.0),
         camCoords = vector4(-812.721, -1375.099, 44.973, 0.0),
         camFov    = 45.0,
@@ -123,13 +108,18 @@ Config.Religious = {
     "Jewish", "Muslim", "Atheist", "None"
 }
 
+--[[
+  filterType field (optional per filter):
+    nil / absent = standard CSS filter via SVG canvas
+    "acid"       = SVG feTurbulence drip + hue-rotate distortion
+]]
 Config.CameraFilters = {
     { name = "None",         css = "none" },
     { name = "Sepia",        css = "sepia(1) contrast(1.1)" },
     { name = "Thunderstorm", css = "grayscale(0.6) brightness(0.7) contrast(1.4) saturate(0.5)" },
     { name = "Blood Moon",   css = "sepia(0.4) hue-rotate(-20deg) saturate(3) brightness(0.75) contrast(1.3)" },
     { name = "Devil Eyes",   css = "sepia(0.2) hue-rotate(300deg) saturate(4) brightness(0.85) contrast(1.5)" },
-    { name = "Acid Trip",    css = "hue-rotate(90deg) saturate(8) brightness(1.1) contrast(1.4)" },
+    { name = "Acid Trip",    css = "hue-rotate(90deg) saturate(8) brightness(1.1) contrast(1.4)", filterType = "acid" },
 }
 
 Config.IDCardNPC = {

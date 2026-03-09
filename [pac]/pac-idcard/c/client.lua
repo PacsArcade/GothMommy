@@ -1,6 +1,6 @@
--- ═══════════════════════════════════════════════════════════
-print("[pac-idcard] VERSION: 2026-03-09-v11 numpad-grid+heading-fix")
--- ═══════════════════════════════════════════════════════════
+-- ═══════════════════════════════════════════════════════════════
+print("[pac-idcard] VERSION: 2026-03-09-v12 svg-lens-filter+acid-drip")
+-- ═══════════════════════════════════════════════════════════════
 
 local idcardData    = false
 local cam           = nil
@@ -12,13 +12,12 @@ local movements3    = {}
 local creating      = false
 local currentFilter = 1
 
--- forward declarations
 local exitCamera
 local setPhotographerHeading
 local cycleFilter
 local applyFilter
 
--- ─── Prompt helpers ───────────────────────────────────────────────────────────
+-- ─── Prompt helpers ─────────────────────────────────────────────────────────
 local function createPrompt(inputName, label, promptGroup, holdMs)
     holdMs = holdMs or 500
     local m = PromptRegisterBegin()
@@ -62,7 +61,7 @@ Citizen.CreateThread(function()
     movements3[2] = createPrompt(Config.Keybinds["printphoto"][1], "Develop Film ($"..developPrice..")", promptGroup3)
 end)
 
--- ─── NUI Callbacks ────────────────────────────────────────────────────────────
+-- ─── NUI Callbacks ──────────────────────────────────────────────────────────
 RegisterNUICallback('close', function()
     SetNuiFocus(false, false)
     AnimpostfxStop("OJDominoBlur")
@@ -83,7 +82,7 @@ RegisterNUICallback('camShoot', function(data)
     Citizen.InvokeNative(0x3B96D87CB7DA1245, true)
 end)
 
--- ─── Camera movement ──────────────────────────────────────────────────────────
+-- ─── Camera movement ────────────────────────────────────────────────────────
 RegisterNUICallback('camMove', function(data)
     local dir = data.dir
     if dir == "exit" then
@@ -113,7 +112,7 @@ RegisterNUICallback('camMove', function(data)
     if data.pcx then PointCamAtCoord(cam, data.pcx, data.pcy, data.pcz) end
 end)
 
--- ─── Network Events ───────────────────────────────────────────────────────────
+-- ─── Network Events ─────────────────────────────────────────────────────────
 RegisterNetEvent('fx-idcard:client:setData',    function(d) idcardData = d     end)
 RegisterNetEvent('fx-idcard:client:clearData',  function()  idcardData = false end)
 RegisterNetEvent('fx-idcard:client:updateData', function()
@@ -150,7 +149,7 @@ RegisterNetEvent("fx-idcard:client:ShowUi", function(typee, data)
     end
 end)
 
--- ─── Helpers ──────────────────────────────────────────────────────────────────
+-- ─── Helpers ────────────────────────────────────────────────────────────────
 function GetClosestPlayer()
     local myPed    = PlayerPedId()
     local myId     = PlayerId()
@@ -170,7 +169,7 @@ applyFilter = function(idx)
     local f = Config.CameraFilters
     if not f or #f == 0 then return end
     local filter = f[idx] or f[1]
-    SendNUIMessage({ action = 'setFilter', css = filter.css, name = filter.name })
+    SendNUIMessage({ action = 'setFilter', css = filter.css, name = filter.name, filterType = filter.filterType })
 end
 
 cycleFilter = function(dir)
@@ -208,7 +207,7 @@ exitCamera = function(photographerKey, restoreHeading)
     end
 end
 
--- ─── Photo session ────────────────────────────────────────────────────────────
+-- ─── Photo session ───────────────────────────────────────────────────────────
 local function takePhoto(v, key)
     DoScreenFadeOut(1000)
     Wait(1000)
@@ -225,7 +224,7 @@ local function takePhoto(v, key)
     _currentDefaultHeading = defaultHeading
 
     SetEntityCoords(ped, pc.x, pc.y, pc.z, false, false, false, false)
-    SetEntityHeading(ped, pc.w)   -- pc.w = 270 (confirmed correct, do not change)
+    SetEntityHeading(ped, pc.w)   -- 270 confirmed correct
     FreezeEntityPosition(ped, true)
     SetPlayerControl(PlayerId(), false)
     Wait(800)
@@ -259,7 +258,7 @@ local function takePhoto(v, key)
     })
 end
 
--- ─── Photographer NPC spawn ───────────────────────────────────────────────────
+-- ─── Photographer NPC spawn ──────────────────────────────────────────────────
 photographerPeds = {}
 
 local function spawnPhotographerPed(key, v)
@@ -320,7 +319,7 @@ Citizen.CreateThread(function()
     end
 end)
 
--- ─── Photographer blips ───────────────────────────────────────────────────────
+-- ─── Photographer blips ──────────────────────────────────────────────────────
 local function createPhotographerBlip(v)
     local c    = v.blips.coords or vector3(v.promptCoords.x, v.promptCoords.y, v.promptCoords.z)
     local blip = N_0x554d9d53f696d002(1664425300, c.x, c.y, c.z)
@@ -340,7 +339,7 @@ Citizen.CreateThread(function()
     end
 end)
 
--- ─── Photographer approach interaction ───────────────────────────────────────
+-- ─── Photographer approach ───────────────────────────────────────────────────
 Citizen.CreateThread(function()
     while true do
         local sleep = 2000
@@ -370,7 +369,7 @@ Citizen.CreateThread(function()
     end
 end)
 
--- ─── /phototest ───────────────────────────────────────────────────────────────
+-- ─── /phototest ─────────────────────────────────────────────────────────────
 RegisterCommand("phototest", function()
     local me = GetEntityCoords(PlayerPedId())
     print(string.format("[phototest] player x=%.3f y=%.3f z=%.3f heading=%.1f cam=%s",
@@ -389,7 +388,7 @@ RegisterCommand("phototest", function()
     end
 end, false)
 
--- ─── IDCard NPC ───────────────────────────────────────────────────────────────
+-- ─── IDCard NPC ──────────────────────────────────────────────────────────────
 local function isOpen(s)
     if not s then return true end
     local h = GetClockHours()
@@ -484,14 +483,12 @@ Citizen.CreateThread(function()
     end
 end)
 
--- ─── /idcard ──────────────────────────────────────────────────────────────────
 if Config.TakeCardType == "sql" then
     RegisterCommand(Config.ShowIdcardCommand, function()
         TriggerEvent("fx-idcard:client:showIDCardSQL")
     end)
 end
 
--- ─── Cleanup ──────────────────────────────────────────────────────────────────
 AddEventHandler('onResourceStop', function(resourceName)
     if GetCurrentResourceName() ~= resourceName then return end
     for _, v in pairs(Config.Photographers) do
