@@ -29,29 +29,33 @@
 ## Step 1 — Pull the branch on VPS
 ```bash
 cd "/home/amp/.ampdata/instances/RedM01/txadmin/server/txData/GothMommy.base/resources"
-git fetch origin && git pull origin feat/pac-camp
+git fetch origin && git reset --hard origin/feat/pac-camp
 ```
 
 ## Step 2 — Database
 The `pac_camp` table and all 19 items are already injected on `gothmommy_db`.
-For a fresh install, run:
+For a fresh install on a new server, run:
 ```bash
 mysql -h amp.pacsarcade.net -P 3307 -u goth_admin -p gothmommy_db \
   < "[pac]/pac-camp/sql/pac-camp-inject.sql"
 ```
-> **Schema note:** VORP uses column `limit` (not `limit_count`). The SQL file
-> uses the correct column name.
+> **Schema note:** VORP uses column `limit` (not `limit_count`). The SQL in
+> `sql/pac-camp-inject.sql` uses the correct column name.
 
 ## Step 3 — Inventory images
-Run this one-liner on the VPS to pull all 19 PNGs from the upstream fork:
+
+> **Path note:** The folder is `[VORP]` (uppercase) and images go in `img/items/`
+
+Run this on the VPS to pull all 19 PNGs directly from the upstream fork:
 ```bash
-INVENTORY_IMG="/home/amp/.ampdata/instances/RedM01/txadmin/server/txData/GothMommy.base/resources/[vorp]/vorp_inventory/html/img"
+INVIMG="/home/amp/.ampdata/instances/RedM01/txadmin/server/txData/GothMommy.base/resources/[VORP]/vorp_inventory/html/img/items"
 SRC="https://raw.githubusercontent.com/PacsArcade/pac-camp/main/rs_camp/img"
+
 for img in campfire_01 campfire_02 chair_wood chest_big chest_little chest_medium \
            door_01 door_02 door_03 door_04 hitchingpost_iron hitchingpost_wood \
            hitchingpost_wood_double table_wood01 tent_bounty02 tent_bounty06 \
            tent_bounty07 tent_collector04 tent_trader; do
-  wget -q "$SRC/${img}.png" -O "$INVENTORY_IMG/${img}.png"
+  wget -q "$SRC/${img}.png" -O "$INVIMG/${img}.png" && echo "OK: ${img}" || echo "FAIL: ${img}"
 done
 ```
 
@@ -61,15 +65,15 @@ Add these lines **in this order**, before any VORP gameplay scripts:
 ensure uiprompt
 ensure pac-camp
 ```
-`uiprompt` must be ensured first — pac-camp's fxmanifest references `@uiprompt/uiprompt.lua`.
+`uiprompt` must come first — pac-camp's fxmanifest references `@uiprompt/uiprompt.lua`.
 
 ## Step 5 — Restart & test
-1. Restart the server (or `refresh` + `start uiprompt` + `start pac-camp` in txAdmin console)
+1. In txAdmin console: `refresh` then `start uiprompt` then `start pac-camp`
 2. Give yourself a test item:
    ```
    /vorp item add [your_server_id] campfire_01 1
    ```
-3. Open inventory, double-click the item
+3. Open inventory, double-click the campfire
 4. Prop should appear in front of you, already snapped to ground
 5. Move with arrow keys, confirm with ENTER
 6. Use `/camp` to enter pickup mode, look at placed object, hold R to pick up
@@ -79,9 +83,9 @@ ensure pac-camp
 ## Adding new placeable items
 1. Add entry to `Config.Items` in `config.lua`
 2. Add matching `INSERT IGNORE` to `sql/pac-camp-inject.sql`
-3. Add PNG to `assets/items/` and copy to `vorp_inventory/html/img/`
+3. Add PNG to `assets/items/` and copy to `[VORP]/vorp_inventory/html/img/items/`
 4. Run the INSERT on the live DB
-5. `refresh` + `restart pac-camp` in txAdmin
+5. `refresh` + `restart pac-camp` in txAdmin console
 
 ---
 
@@ -98,7 +102,7 @@ ensure pac-camp
 | ENTER         | Confirm placement   |
 | G             | Cancel placement    |
 
-**Placement is blocked inside towns** (see `Config.AllowedTowns`).
+**Placement is blocked inside towns** (see `Config.AllowedTowns` in config.lua).  
 **Placement is blocked on steep slopes** (see `Config.MaxSlopeAngle`, default 15°).
 
 ---
