@@ -13,9 +13,9 @@
         <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
         <style>
-            * { box-sizing: border-box; }
+            * { box-sizing: border-box; margin: 0; padding: 0; }
 
-            /* Form theme */
+            /* ── Form theme ── */
             .create { background: rgba(10,6,2,0.92) !important; color: #e8d8b0 !important; }
             .create .label, .create span { color: #c8a96e !important; }
             .create input, .create select {
@@ -29,34 +29,39 @@
             .name-cont .label { margin-bottom:2px; }
             .name-cont input#name { margin-top:4px; }
 
-            /* === Camera filter layer ===
-               Full-screen coloured glass pane sitting BELOW the HUD.
-               The CSS filter property is applied here so the game scene
-               appears tinted while the overlay text stays crisp.
-            */
+            /* ══════════════════════════════════════════════════════
+               CAMERA SYSTEM
+               Layer order (z-index):
+                 9980  #cam-filter-layer   — scene tint (filter here)
+                 9999  #camera-overlay     — HUD (isolated from filter)
+                10000  #cam-flash          — white-out on shutter
+               The overlay uses isolation:isolate so CSS filters on
+               #cam-filter-layer cannot bleed into the HUD elements.
+            ══════════════════════════════════════════════════════ */
+
+            /* Scene tint layer */
             #cam-filter-layer {
                 display: none;
                 position: fixed;
                 inset: 0;
                 pointer-events: none;
-                z-index: 9990;
-                /* A semi-transparent background is required for CSS filter
-                   to have any visible effect on the rendered page. Without
-                   a background the div has nothing to filter. */
+                z-index: 9980;
+                /* needs a background for filter to be visible */
                 background: rgba(0,0,0,0.01);
                 transition: filter 0.25s ease;
             }
 
-            /* Camera overlay wrapper (HUD on top) */
+            /* HUD wrapper — isolated so parent filter can't bleed in */
             #camera-overlay {
                 display: none;
                 position: fixed;
                 inset: 0;
                 pointer-events: none;
                 z-index: 9999;
+                isolation: isolate;   /* ← key fix: breaks filter inheritance */
             }
 
-            /* Filter bar – bottom centre */
+            /* ── Filter bar (bottom centre) ── */
             #filter-bar {
                 position: absolute;
                 bottom: 44px;
@@ -65,11 +70,13 @@
                 display: flex;
                 align-items: center;
                 gap: 18px;
-                background: rgba(10,6,2,0.78);
+                background: rgba(10,6,2,0.82);
                 border: 1px solid #8b6914;
                 border-radius: 5px;
                 padding: 8px 24px;
                 pointer-events: none;
+                /* isolate so filter layer below doesn't tint text */
+                isolation: isolate;
             }
             .filter-key {
                 font-family: 'Georgia', serif;
@@ -86,28 +93,33 @@
                 font-size: 20px;
                 color: #f0e0b0;
                 letter-spacing: 3px;
-                text-shadow: 1px 1px 8px #000, 0 0 14px #8b6914;
+                text-shadow: 1px 1px 8px #000;
                 min-width: 150px;
                 text-align: center;
             }
 
-            /* Controls panel – right side */
+            /* ── Controls panel (right side) — shaded box ── */
             #cam-controls {
                 position: absolute;
                 top: 50%;
-                right: 38px;
+                right: 32px;
                 transform: translateY(-50%);
-                display: flex;
-                flex-direction: column;
-                gap: 7px;
                 pointer-events: none;
+                isolation: isolate;
+                /* shaded grouping box */
+                background: rgba(10,6,2,0.78);
+                border: 1px solid #8b6914;
+                border-radius: 6px;
+                padding: 16px 20px;
             }
             .cam-ctrl-row {
                 display: flex;
                 align-items: center;
                 justify-content: flex-end;
                 gap: 14px;
+                margin-bottom: 6px;
             }
+            .cam-ctrl-row:last-child { margin-bottom: 0; }
             .cam-ctrl-label {
                 font-family: 'Georgia', serif;
                 font-size: 15px;
@@ -121,11 +133,11 @@
                 font-family: 'Georgia', serif;
                 font-size: 14px;
                 color: #f0e0b0;
-                background: rgba(10,6,2,0.85);
+                background: rgba(20,12,2,0.90);
                 border: 1px solid #8b6914;
                 border-radius: 3px;
                 padding: 4px 12px;
-                min-width: 54px;
+                min-width: 60px;
                 text-align: center;
                 box-shadow: 0 1px 5px rgba(0,0,0,0.7);
                 letter-spacing: 1px;
@@ -133,42 +145,62 @@
             .cam-ctrl-divider {
                 height: 1px;
                 background: rgba(139,105,20,0.40);
-                margin: 4px 0;
+                margin: 7px 0;
             }
             .cam-ctrl-section {
                 font-family: 'Georgia', serif;
-                font-size: 15px;
+                font-size: 16px;
                 color: #d4a843;
-                text-align: right;
+                text-align: center;
                 letter-spacing: 3px;
                 text-transform: uppercase;
-                margin-bottom: 3px;
+                margin-bottom: 10px;
                 text-shadow: 0 0 8px rgba(212,168,67,0.5);
+                border-bottom: 1px solid rgba(139,105,20,0.4);
+                padding-bottom: 8px;
             }
 
-            /* Countdown overlay */
+            /* ── Countdown ── */
             #cam-countdown {
                 display: none;
                 position: absolute;
                 top: 50%;
                 left: 50%;
-                transform: translate(-50%, -50%);
+                transform: translate(-50%,-50%);
                 font-family: 'Georgia', serif;
-                font-size: 120px;
+                font-size: 140px;
                 color: #f0e0b0;
-                text-shadow: 0 0 40px #8b6914, 2px 2px 8px #000;
+                text-shadow: 0 0 60px rgba(212,168,67,0.8), 2px 2px 10px #000;
                 letter-spacing: 4px;
                 pointer-events: none;
-                animation: countdown-pulse 0.8s ease-in-out;
-            }
-            @keyframes countdown-pulse {
-                0%   { transform: translate(-50%,-50%) scale(1.4); opacity: 0; }
-                30%  { transform: translate(-50%,-50%) scale(1.0); opacity: 1; }
-                80%  { transform: translate(-50%,-50%) scale(1.0); opacity: 1; }
-                100% { transform: translate(-50%,-50%) scale(0.8); opacity: 0; }
+                /* frame around the number */
+                background: rgba(10,6,2,0.55);
+                border: 2px solid rgba(139,105,20,0.7);
+                border-radius: 8px;
+                padding: 10px 40px;
             }
 
-            /* Camera flash */
+            /* ── Photo saved toast (bottom-right, above Steam) ── */
+            #cam-saved-toast {
+                display: none;
+                position: fixed;
+                bottom: 80px;   /* Steam screenshot notification sits ~60px up */
+                right: 24px;
+                background: rgba(10,6,2,0.88);
+                border: 1px solid #8b6914;
+                border-radius: 5px;
+                padding: 10px 20px;
+                font-family: 'Georgia', serif;
+                font-size: 15px;
+                color: #f0e0b0;
+                letter-spacing: 1px;
+                text-shadow: 1px 1px 4px #000;
+                z-index: 10001;
+                pointer-events: none;
+                isolation: isolate;
+            }
+
+            /* ── Camera flash ── */
             #cam-flash {
                 display: none;
                 position: fixed;
@@ -182,26 +214,29 @@
     </head>
 <body>
 
-    <!-- Scene tint layer (filter applied here so game scene appears coloured) -->
+    <!-- Scene tint (filter applied here) -->
     <div id="cam-filter-layer"></div>
 
-    <!-- Camera flash (white-out on shutter) -->
+    <!-- Camera flash -->
     <div id="cam-flash"></div>
 
-    <!-- Camera HUD overlay -->
+    <!-- Photo saved toast (outside overlay so filter doesn't affect it) -->
+    <div id="cam-saved-toast">📷 Photo Saved</div>
+
+    <!-- Camera HUD (isolated from filter layer) -->
     <div id="camera-overlay">
 
-        <!-- Countdown number -->
+        <!-- Countdown (hidden during normal operation) -->
         <div id="cam-countdown"></div>
 
-        <!-- Filter bar bottom-centre -->
+        <!-- Filter bar (bottom centre) -->
         <div id="filter-bar">
             <span class="filter-key">NUM 1</span>
             <span id="filter-label">None</span>
             <span class="filter-key">NUM 3</span>
         </div>
 
-        <!-- Controls panel right side -->
+        <!-- Controls panel (right side) -->
         <div id="cam-controls">
             <div class="cam-ctrl-section">Photographer</div>
 
@@ -289,8 +324,7 @@
                 <option value="">-- Select --</option>
                 <option>Christian</option><option>Buddhist</option><option>Wiccan</option>
                 <option>Pagan</option><option>Spiritualist</option><option>Coven</option>
-                <option>Jewish</option><option>Muslim</option><option>Atheist</option>
-                <option>None</option>
+                <option>Jewish</option><option>Muslim</option><option>Atheist</option><option>None</option>
             </select>
             <div class="line"></div>
         </div>

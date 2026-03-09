@@ -60,8 +60,8 @@ Config.HideHud = function() end
 Config.ShowHud = function() end
 
 Config.Prices = {
-    printphoto = 0,   -- FREE to take the portrait photo
-    idcard     = 5,   -- $5 to develop / print the film
+    printphoto = 0,    -- FREE to enter the photo booth
+    idcard     = 5,    -- $5 to develop the film
     illegal    = 100,
 }
 
@@ -76,21 +76,24 @@ Config.WomanIdCardItem         = "woman_idcard"
 Config.ShowDistance            = 1.5
 
 --[[
-  NAVMESH +1 RULE: Both CreatePed AND SetEntityCoords snap up +1 in this building.
-  All z values in config must be 1 unit BELOW the desired floor z.
+  NAVMESH +1 RULE: Both CreatePed AND SetEntityCoords snap +1 in this building.
+  Config z must be 1 unit below desired floor z.
 
-  Desired floor z = 44.073 (NPC confirmed), 44.278 (player pose confirmed)
-  Config z for NPC        = 43.073  (CreatePed snaps to 44.073)
-  Config z for pedCoords  = 43.278  (SetEntityCoords snaps to 44.278)
-  BUT player is still landing at 44.328 not 44.278, so we nudge to 43.228.
+  Player desired floor z ≈ 44.278  →  config pedCoords.z = 43.228
+  NPC    desired floor z ≈ 44.073  →  config npc.coords.z = 43.073
 
   RDR heading: 0=North  90=West  180=South  270=East
+  Camera is at x=-812 (higher X). Player at x=-815 (lower X).
+  Player must face West (heading=90) to face the camera.
+  NPC default heading = 270 (faces East / door)
+  NPC photoHeading    = 90  (faces West / toward player)
 ]]
 Config.Photographers = {
     ["Blackwater"] = {
         promptCoords   = vector4(-812.00, -1373.50, 44.07, 180.0),
         promptDistance = 3.5,
-        pedCoords = vector4(-814.981, -1375.036, 43.228, 270.0),
+        -- Player pose: heading 90 = faces West = faces the camera
+        pedCoords = vector4(-814.981, -1375.036, 43.228, 90.0),
         camCoords = vector4(-812.721, -1375.099, 44.973, 0.0),
         camFov    = 45.0,
         npc = {

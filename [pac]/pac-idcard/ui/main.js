@@ -1,34 +1,35 @@
 $(document).ready(function () {
-    $(".id-card").hide();
-    $(".photograph").hide();
-    $(".printphoto").hide();
-    $(".create").hide();
-    $(".previewcreate-photo").hide();
+    $('.id-card').hide();
+    $('.photograph').hide();
+    $('.printphoto').hide();
+    $('.create').hide();
+    $('.previewcreate-photo').hide();
     var setIllegal   = false;
     var camTarget    = { pcx: 0, pcy: 0, pcz: 0 };
     var cameraActive = false;
-    var shootLocked  = false;  // prevent double-trigger during countdown
+    var shootLocked  = false;
 
-    // ── Filter ──────────────────────────────────────────────────────────
-    // We apply the CSS filter to #cam-filter-layer.
-    // IMPORTANT: the element needs a non-transparent background for
-    // CSS filters to be visible, so we give it rgba(0,0,0,0.01) in CSS.
-    var filterLayer = document.getElementById('cam-filter-layer');
+    var filterLayer  = document.getElementById('cam-filter-layer');
 
+    // ── Filter ────────────────────────────────────────────────────────
+    // Apply to BOTH the tint layer AND document.body so the game scene
+    // (which renders behind the NUI page) appears tinted.
+    // The HUD uses isolation:isolate to prevent inheriting the filter.
     function setFilter(css, name) {
         var f = (!css || css === 'none') ? 'none' : css;
-        console.log('[pac-idcard] setFilter css=', f, 'name=', name);
-        filterLayer.style.filter = f;
-        // Also tint body background so the whole page is affected,
-        // not just the transparent overlay div.
-        document.body.style.filter = f;
+        filterLayer.style.filter    = f;
+        document.body.style.filter  = f;
         $('#filter-label').text(name || 'None');
     }
 
-    // ── Countdown + flash + screenshot ──────────────────────────────────
+    // ── Countdown + flash + screenshot ───────────────────────────────
     function doCountdownAndShoot() {
         if (shootLocked) return;
         shootLocked = true;
+
+        // Hide controls and filter bar during countdown
+        $('#cam-controls, #filter-bar').fadeOut(200);
+
         var $cd    = $('#cam-countdown');
         var $flash = $('#cam-flash');
         var counts = ['3','2','1'];
@@ -36,51 +37,49 @@ $(document).ready(function () {
 
         function showNext() {
             if (i < counts.length) {
-                $cd.text(counts[i]).css({ display:'block', opacity:1 });
-                // re-trigger animation by removing and re-adding
-                $cd.removeClass('countdown-anim');
-                void $cd[0].offsetWidth; // reflow
-                $cd.addClass('countdown-anim');
+                $cd.text(counts[i]).show();
                 i++;
                 setTimeout(showNext, 900);
             } else {
-                // Shoot!
                 $cd.hide();
                 // White flash
-                $flash.css({ display:'block', opacity:1 });
-                $flash.animate({ opacity: 0 }, 600, function() {
-                    $flash.hide();
-                });
-                // Tell Lua to save screenshot
+                $flash.css({ display:'block', opacity:1 })
+                      .animate({ opacity: 0 }, 500, function() { $flash.hide(); });
+                // Tell Lua to capture screenshot
                 $.post('https://' + GetParentResourceName() + '/camShoot', JSON.stringify({}));
+                // Show saved toast bottom-right (above Steam ~80px)
+                $('#cam-saved-toast').stop(true).css({ display:'block', opacity:1 })
+                    .delay(2200).fadeOut(600);
+                // Restore controls
+                setTimeout(function() {
+                    $('#cam-controls, #filter-bar').fadeIn(300);
+                }, 700);
                 shootLocked = false;
             }
         }
         showNext();
     }
 
-    // ── Numpad keyboard layout ───────────────────────────────────────────
-    // Uses e.code so numpad keys register regardless of NumLock state.
-    // e.key fallback handles laptops without dedicated numpad.
+    // ── Keyboard layout ───────────────────────────────────────────────
     var keyMap = {
-        'Numpad8':      'up',
-        'Numpad2':      'down',
-        'Numpad4':      'left',
-        'Numpad6':      'right',
-        'Numpad7':      'fwd',
-        'Numpad9':      'back',
-        'Numpad1':      'filter_prev',
-        'Numpad3':      'filter_next',
-        'Numpad5':      'reset',
-        'Numpad0':      'exit',
-        'NumpadEnter':  'shoot',
-        'Enter':        'shoot',
-        'ArrowUp':      'up',
-        'ArrowDown':    'down',
-        'ArrowLeft':    'left',
-        'ArrowRight':   'right',
-        'Backspace':    'exit',
-        'Escape':       'exit',
+        'Numpad8':     'up',
+        'Numpad2':     'down',
+        'Numpad4':     'left',
+        'Numpad6':     'right',
+        'Numpad7':     'fwd',
+        'Numpad9':     'back',
+        'Numpad1':     'filter_prev',
+        'Numpad3':     'filter_next',
+        'Numpad5':     'reset',
+        'Numpad0':     'exit',
+        'NumpadEnter': 'shoot',
+        'Enter':       'shoot',
+        'ArrowUp':     'up',
+        'ArrowDown':   'down',
+        'ArrowLeft':   'left',
+        'ArrowRight':  'right',
+        'Backspace':   'exit',
+        'Escape':      'exit',
     };
 
     $(document).on('keydown', function(e) {
@@ -88,10 +87,7 @@ $(document).ready(function () {
         var dir = keyMap[e.code] || keyMap[e.key];
         if (!dir) return;
         e.preventDefault();
-        if (dir === 'shoot') {
-            doCountdownAndShoot();
-            return;
-        }
+        if (dir === 'shoot') { doCountdownAndShoot(); return; }
         $.post('https://' + GetParentResourceName() + '/camMove', JSON.stringify({
             dir: dir,
             pcx: camTarget.pcx,
@@ -100,7 +96,7 @@ $(document).ready(function () {
         }));
     });
 
-    // ── ID Card display ──────────────────────────────────────────────────
+    // ── ID Card display ───────────────────────────────────────────────
     function setupIDCard(array) {
         if (!array || typeof array !== 'object') return;
         var sex = array.sex === 'Female' ? 'F' : 'M';
@@ -123,7 +119,6 @@ $(document).ready(function () {
         $('.id-card').removeClass('animate__animated animate__fadeOutRight')
             .addClass('animate__animated animate__fadeInRight').show();
     }
-
     function closeIDCard() {
         ShowIdCard = false;
         $('.id-card').removeClass('animate__animated animate__fadeInRight')
@@ -131,7 +126,7 @@ $(document).ready(function () {
             .one('animationend', function() { $(this).hide(); });
     }
 
-    // ── Form submit ───────────────────────────────────────────────────────
+    // ── Form submit ───────────────────────────────────────────────────
     $('#submit').click(function () {
         $.post('https://' + GetParentResourceName() + '/createIdCard', JSON.stringify({
             name:      $('#name').val(),
@@ -184,7 +179,6 @@ $(document).ready(function () {
         $('.photograph .photo').attr('src', img);
         $('.photograph').fadeIn(500);
     }
-
     function closePrintPhoto() {
         ShowPhoto = false;
         $('.photograph,.printphoto,.create,.previewcreate-photo').fadeOut(500);
@@ -195,12 +189,10 @@ $(document).ready(function () {
         if (imgLink) $('.photo').attr('src', imgLink);
         else $.post('https://' + GetParentResourceName() + '/notify', JSON.stringify({ text:'noimg' }));
     });
-
     $('.close,.close-create').click(function() {
         closePrintPhoto();
         $.post('https://' + GetParentResourceName() + '/close', JSON.stringify({}));
     });
-
     $('.print').click(function() {
         var imgLink = $('#link').val();
         if (imgLink) {
@@ -210,7 +202,6 @@ $(document).ready(function () {
             $.post('https://' + GetParentResourceName() + '/notify', JSON.stringify({ text:'noimg' }));
         }
     });
-
     $(document).keyup(function(e) {
         if (cameraActive) return;
         if (e.key === 'Escape') {
@@ -224,24 +215,14 @@ $(document).ready(function () {
     var ShowPhoto  = false;
     var ShowIdCard = false;
 
-    // ── Message handler ──────────────────────────────────────────────────
+    // ── Message handler ───────────────────────────────────────────────
     window.addEventListener('message', function(event) {
         var d = event.data;
         switch (d.action) {
-            case 'openIdCard':
-                ShowIdCard = true;
-                setupIDCard(d.array);
-                break;
-            case 'close':
-                closeIDCard();
-                break;
-            case 'print':
-                $('.printphoto').fadeIn(500);
-                break;
-            case 'showphoto':
-                ShowPhoto = true;
-                showPrintPhoto(d.array.img);
-                break;
+            case 'openIdCard':   ShowIdCard = true; setupIDCard(d.array); break;
+            case 'close':        closeIDCard(); break;
+            case 'print':        $('.printphoto').fadeIn(500); break;
+            case 'showphoto':    ShowPhoto = true; showPrintPhoto(d.array.img); break;
             case 'createidcard':
                 if (d.illegal === true) {
                     $('#cityname,#heightinput,#ageinput,#sex-man,#sex-women').removeAttr('disabled');
@@ -258,12 +239,11 @@ $(document).ready(function () {
                     camTarget    = { pcx: d.pcx||0, pcy: d.pcy||0, pcz: d.pcz||0 };
                     cameraActive = true;
                     shootLocked  = false;
-                    // reset filter display
-                    filterLayer.style.filter  = 'none';
+                    filterLayer.style.filter   = 'none';
                     document.body.style.filter = 'none';
                     $('#filter-label').text('None');
-                    // show tint layer + HUD
-                    filterLayer.style.display = 'block';
+                    filterLayer.style.display  = 'block';
+                    $('#cam-controls, #filter-bar').show();
                     $('#camera-overlay').show();
                 } else {
                     cameraActive = false;
@@ -273,6 +253,7 @@ $(document).ready(function () {
                     document.body.style.filter = 'none';
                     $('#filter-label').text('');
                     $('#cam-countdown').hide();
+                    $('#cam-saved-toast').stop(true).hide();
                 }
                 break;
         }
