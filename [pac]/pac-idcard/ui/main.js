@@ -14,50 +14,19 @@ $(document).ready(function () {
     var $pixel = $('#fl-pixel');
     var $fog   = $('#fl-fog');
     var $acid  = $('#fl-acid');
-    var pixelCanvas = document.getElementById('pixel-canvas');
-    var pixelCtx    = pixelCanvas ? pixelCanvas.getContext('2d') : null;
 
     function clearFilters() {
         $solid.hide().css('background-color', '');
         $pixel.hide();
-        if (pixelCtx) pixelCtx.clearRect(0, 0, pixelCanvas.width, pixelCanvas.height);
         $fog.hide();
         $acid.hide();
-    }
-
-    // -------------------------------------------------------
-    // PIXELATED
-    // 32px blocks at low opacity so the game scene shows
-    // through clearly with a warm mosaic tint.
-    // Drawn ONCE (no shimmer animation) - stable mosaic.
-    // -------------------------------------------------------
-    function startPixel(bs) {
-        bs = bs || 32;
-        var W = window.innerWidth;
-        var H = window.innerHeight;
-        var cols = Math.ceil(W / bs);
-        var rows = Math.ceil(H / bs);
-        pixelCanvas.width  = W;
-        pixelCanvas.height = H;
-        for (var y = 0; y < rows; y++) {
-            for (var x = 0; x < cols; x++) {
-                // Warm sepia tones, varied slightly per block
-                var r = 60  + Math.floor(Math.random() * 50);
-                var g = 35  + Math.floor(Math.random() * 30);
-                var b = 8   + Math.floor(Math.random() * 18);
-                var a = (0.22 + Math.random() * 0.18).toFixed(2); // 0.22-0.40
-                pixelCtx.fillStyle = 'rgba(' + r + ',' + g + ',' + b + ',' + a + ')';
-                pixelCtx.fillRect(x * bs, y * bs, bs - 1, bs - 1); // -1 creates a thin dark gap = block edge
-            }
-        }
-        $pixel.show();
     }
 
     function setFilter(d) {
         clearFilters();
         var type = d.filterType;
         if (!type) {
-            // None
+            // None — no overlay
         } else if (type === 'solid') {
             $solid.css('background-color',
                 'rgba('+(d.r||0)+','+(d.g||0)+','+(d.b||0)+','+(d.a||0.40)+')');
@@ -66,23 +35,24 @@ $(document).ready(function () {
             $fog.show();
         } else if (type === 'acid') {
             $acid.show();
-        } else if (type === 'pixel') {
-            startPixel(d.size || 32);
         }
+        // 'pixel' filter removed — premium feature (see config comments)
         $('#filter-label').text(d.name || 'None');
     }
 
     // -------------------------------------------------------
-    // Countdown
-    // Use inline flex so digit is centred both axes.
+    // Countdown: 3-2-1, then prompt player to take screenshot
+    // Player presses their own screenshot key (e.g. F12 Steam)
+    // then presses ENTER again to return to filter selection.
     // -------------------------------------------------------
     function showCount(text) {
-        var $cd = $('#cam-countdown');
-        $cd.text(text).css('display', 'flex');
+        $('#cam-countdown').text(text).css('display', 'flex');
     }
     function hideCount() {
         $('#cam-countdown').css('display', 'none').text('');
     }
+
+    var waitingForScreenshot = false;
 
     function doCountdownAndShoot() {
         if (shootLocked) return;
@@ -90,20 +60,20 @@ $(document).ready(function () {
         $('#cam-controls,#filter-bar').fadeOut(200);
         var $flash = $('#cam-flash');
         var counts = ['3', '2', '1'], i = 0;
+
         function showNext() {
             if (i < counts.length) {
                 showCount(counts[i]); i++;
                 setTimeout(showNext, 900);
             } else {
                 hideCount();
+                // White flash — shutter moment
                 $flash.css({display:'block', opacity:1}).animate({opacity:0}, 500, function(){ $flash.hide(); });
-                // Fire Lua native screenshot export
+                // Fire Lua native screenshot export (saves to RDR documents folder)
                 $.post('https://'+GetParentResourceName()+'/camShoot', JSON.stringify({}));
-                // NOTE: F12 is intercepted by Steam before game/CEF.
-                // Players should use their own screenshot key.
-                // We do NOT show a misleading "Photo Saved" toast.
-                setTimeout(function(){ $('#cam-controls,#filter-bar').fadeIn(300); }, 700);
-                shootLocked = false;
+                // Show "press your screenshot key" prompt
+                waitingForScreenshot = true;
+                $('#cam-screenshot-prompt').fadeIn(300);
             }
         }
         showNext();
@@ -119,8 +89,21 @@ $(document).ready(function () {
         'ArrowUp':'up','ArrowDown':'down','ArrowLeft':'left','ArrowRight':'right',
         'Backspace':'exit','Escape':'exit',
     };
+
     $(document).on('keydown', function(e) {
         if (!cameraActive) return;
+
+        // If waiting for screenshot confirmation, any key dismisses the prompt
+        if (waitingForScreenshot) {
+            e.preventDefault();
+            waitingForScreenshot = false;
+            $('#cam-screenshot-prompt').fadeOut(200, function(){
+                $('#cam-controls,#filter-bar').fadeIn(300);
+                shootLocked = false;
+            });
+            return;
+        }
+
         var dir = keyMap[e.code] || keyMap[e.key];
         if (!dir) return;
         e.preventDefault();
@@ -221,14 +204,17 @@ $(document).ready(function () {
             case 'showCameraOverlay':
                 if (d.visible) {
                     camTarget = {pcx:d.pcx||0, pcy:d.pcy||0, pcz:d.pcz||0};
-                    cameraActive=true; shootLocked=false;
+                    cameraActive=true; shootLocked=false; waitingForScreenshot=false;
                     clearFilters(); hideCount();
                     $('#filter-label').text('None');
+                    $('#cam-screenshot-prompt').hide();
                     $('#cam-controls,#filter-bar').show();
                     $('#camera-overlay').show();
                 } else {
                     cameraActive=false; clearFilters(); hideCount();
+                    waitingForScreenshot=false;
                     $('#camera-overlay').hide();
+                    $('#cam-screenshot-prompt').hide();
                     $('#filter-label').text('');
                 }
                 break;
