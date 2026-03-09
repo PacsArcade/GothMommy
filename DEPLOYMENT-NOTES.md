@@ -24,8 +24,12 @@ ensure vorp_inventory
 ensure oxmysql
 ensure uiprompt
 ensure pac-idcard
+<<<<<<< HEAD
 ensure pac-camp
 ensure pac-companions
+=======
+# ensure pac-camp   ← add after feat/pac-camp merges
+>>>>>>> main
 ```
 
 ## Database
@@ -43,6 +47,7 @@ After adding any new script with items, copy PNGs to:
 ## Web Portal
 - ID photo upload: https://pacsarcade.org/idphotos/
 - File: `/var/www/vhosts/pacsarcade.org/httpdocs/idphotos/index.html`
+<<<<<<< HEAD
 
 ---
 
@@ -104,3 +109,5 @@ VALUES
   ('man_idcard',   'ID Card (Male)',   1, 1, 'item_standard', 1, 'Official Goth Mommy RP identity card.'),
   ('woman_idcard', 'ID Card (Female)', 1, 1, 'item_standard', 1, 'Official Goth Mommy RP identity card.');
 ```
+=======
+>>>>>>> main

@@ -1,0 +1,27 @@
+fx_version 'cerulean'
+game 'rdr3'
+rdr3_warning 'I acknowledge that this is a prerelease build of RedM, and I am aware my resources *will* become incompatible once RedM ships.'
+
+description 'pac-camp - Player camp placement system for Goth Mommy RP'
+author 'PacsArcade (based on rs_camp by riversafe)'
+version '1.0'
+
+ui_page 'html/index.html'
+
+files {
+    'html/index.html',
+}
+
+shared_scripts {
+    'config.lua'
+}
+
+client_scripts {
+    -- uiprompt is a standalone resource ensured before pac-camp in server.cfg
+    '@uiprompt/uiprompt.lua',
+    'c/c.lua',
+}
+
+server_scripts {
+    's/s.lua'
+}
