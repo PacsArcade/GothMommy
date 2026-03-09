@@ -6,10 +6,15 @@ $(document).ready(function () {
     $(".previewcreate-photo").hide();
     var setIllegal = false;
 
-    // ── Camera filter overlay ─────────────────────────────────────────────
+    // ── Camera filter ─────────────────────────────────────────────────────
+    // Filters are applied to document.body so they tint the entire game view.
+    // The camera-overlay div just holds the filter name label.
     function setFilter(css, name) {
-        var overlay = $("#camera-overlay");
-        overlay.css('filter', (css === 'none' || !css) ? 'none' : css);
+        if (!css || css === 'none') {
+            document.body.style.filter = 'none';
+        } else {
+            document.body.style.filter = css;
+        }
         $("#filter-label").text(name || '');
     }
 
@@ -20,14 +25,9 @@ $(document).ready(function () {
             return;
         }
         var sex = array.sex === "Female" ? "F" : "M";
-
-        // ID No field: show the formatted license number, not the raw integer
         var displayId = array.licenseNumber || array.prev_license || ("GMRP-" + String(array.charid || 'N/A').padStart(6, '0'));
         $(".charid").html(displayId);
-
-        // Previous License field (bottom right of card)
         $(".license").html(array.prev_license || displayId);
-
         $(".sex").html(sex);
         $(".hair").html(array.hair || "N/A");
         $(".eyes").html(array.eye || "N/A");
@@ -37,7 +37,6 @@ $(document).ready(function () {
         $(".dateofbirth").html(array.date || "N/A");
         $(".age").html(array.age || "N/A");
         $(".name").html(array.name || "N/A");
-        // country slot: use server name instead of blank/N/A
         $(".country").html(array.country || "Goth Mommy RP");
         $(".card-zone").html(array.cityname || "N/A");
         $(".playerimg").attr("src", array.img || "/path/to/default/image.png");
@@ -82,22 +81,16 @@ $(document).ready(function () {
     function CreateIdCardSetData(data, illegal) {
         setIllegal = illegal;
         $("#name").val(data.name);
-
-        // City of birth dropdown
         var city = data.city || "Blackwater";
         $("#cityname").val(
             $("#cityname option[value='" + city + "']").length ? city : "Other"
         );
-
-        // Religion dropdown
         var rel = data.religious || "";
         $("#religious").val(
             $("#religious option[value='" + rel + "']").length ? rel : ""
         );
-
         $("#ageinput").val(data.age);
         $("#weightinput").val(data.weight ? data.weight + "KG" : "80KG");
-
         if (data.sex === "Male") {
             $("#sex-man").prop("checked", true);
             $("#sex-women").prop("checked", false);
@@ -108,24 +101,17 @@ $(document).ready(function () {
         $("#sex-man, #sex-women").change(function () {
             $("#sex-man, #sex-women").not($(this)).prop("checked", false);
         });
-
         if (!illegal) {
             var maxYear = 1899 - data.age;
             $("#dateinput").attr("max", maxYear + "-12-31")
                            .attr("min", maxYear + "-01-01")
                            .val(maxYear + "-01-01");
         }
-
         $("#previewphoto").attr("src", data.img).attr("data-itemid", data.itemId);
-
         var heightMap = {0.85:"4'8",0.90:"4'9",0.95:"4'10",1.0:"5'0",1.05:"5'1",1.10:"5'2"};
         $("#heightinput").val(heightMap[data.height] || "5'0");
-
-        // Hair dropdown
         var hair = data.hair || "Black";
         $("#hair").val($("#hair option[value='" + hair + "']").length ? hair : "Black");
-
-        // Eye dropdown
         var eye = data.eye || "Brown";
         $("#eye").val($("#eye option[value='" + eye + "']").length ? eye : "Brown");
     }
@@ -210,14 +196,17 @@ $(document).ready(function () {
                 $(".previewcreate-photo").fadeIn(500);
                 break;
             case 'setFilter':
+                // Apply filter to body = tints entire game view including the rendered world
                 setFilter(d.css, d.name);
                 break;
             case 'showCameraOverlay':
                 if (d.visible) {
                     $("#camera-overlay").show();
                 } else {
+                    // Clear filter from body when exiting camera
+                    document.body.style.filter = 'none';
                     $("#camera-overlay").hide();
-                    setFilter('none', '');
+                    $("#filter-label").text('');
                 }
                 break;
         }

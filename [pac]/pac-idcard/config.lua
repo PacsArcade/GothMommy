@@ -76,50 +76,43 @@ Config.WomanIdCardItem         = "woman_idcard"
 Config.ShowDistance            = 1.5
 
 --[[
-  COORDS FROM LIVE /phototest MEASUREMENTS:
+  COORDS - confirmed from live /phototest measurements
 
-  Player pose spot:  x=-814.981  y=-1375.036  z=44.278  (player stands here, faces toward cam)
-  Camera position:   x=-812.721  y=-1375.099  z=44.973  (above subject eye level)
-  NPC position:      x=-811.198  y=-1372.289  z=44.073  (confirmed floor z)
+  NPC floor z confirmed = 44.073 (player stood there in first person)
+  BUT CreatePed in this building adds +1 to z (navmesh behaviour).
+  So we set npc coords.z = 43.073 and it will snap to 44.073.
 
-  Camera yaw: cam is at x=-812.7, player at x=-814.9
-    dx = -814.9 - (-812.7) = -2.2  (player is to the WEST/negative-X of cam)
-    In RDR: heading = atan2(-dx, -dy) converted... but easier:
-    We want cam to look toward x=-814.9 from x=-812.7
-    That's looking in the -X direction = West = RDR yaw ~270 degrees
-    (RDR: 0=N 90=W 180=S 270=E -- NO wait RDR is clockwise from North:
-      0=N, 90=E, 180=S, 270=W)
-    So looking WEST = 270 yaw.
-    But SetCamRot yaw behaves differently from entity heading.
-    SetCamRot(cam, pitch, roll, yaw, 2) where yaw=0 looks North.
-    To look West (negative X): yaw = -90 or 270.
+  Player heading:
+    RDR entity heading: 0=North, 90=West, 180=South, 270=East
+    Camera is East of player (higher X), so player must face heading=270 (East)
+    heading=90 was showing the player's BACK to camera - that was wrong.
 
-    Actually from empirical testing in RDR3 scripted cams:
-    SetCamRot yaw: 0=North, positive=clockwise, so West = -90 (or 270)
+  Camera:
+    Placed at player-measured position x=-812.721, y=-1375.099, z=44.973
+    PointCamAtCoord aims at player chest on startup only.
+    Arrow keys then nudge cam position freely - NOT re-locked each frame.
 ]]
-
 Config.Photographers = {
     ["Blackwater"] = {
         promptCoords   = vector4(-812.00, -1373.50, 44.07, 180.0),
         promptDistance = 3.5,
 
-        -- Player stands here for photo (confirmed from standing in spot + /phototest)
-        pedCoords = vector4(-814.981, -1375.036, 44.278, 90.0),
-        -- heading=90 in RDR entity heading = faces EAST (positive X)
-        -- The camera is at x=-812 which is EAST of x=-814, so player faces East = toward cam. Correct.
+        -- Player stands here: confirmed from phototest
+        -- heading=270 = faces East = toward camera (camera is at higher X)
+        pedCoords = vector4(-814.981, -1375.036, 44.278, 270.0),
 
-        -- Camera sits east of player, looks west toward subject
-        -- z raised slightly above eye level for portrait framing
-        -- yaw=-90 (or 270) to look west in SetCamRot
-        camCoords = vector4(-812.721, -1375.099, 44.973, -90.0),
+        -- Camera position: confirmed from phototest
+        -- PointCamAtCoord will aim it at the player on start
+        camCoords = vector4(-812.721, -1375.099, 44.973, 0.0),
         camFov    = 45.0,
 
         npc = {
             model    = "mp_re_photography_females_01",
             hash     = 0x5730F05E,
             fallback = "cs_brontesbutler",
-            -- Confirmed floor z=44.073, heading 270=faces west (toward player at x=-814)
-            coords   = vector4(-811.198, -1372.289, 44.073, 270.0),
+            -- z=43.073: CreatePed adds +1 in this building, so it will snap to 44.073
+            -- heading=270: faces East (toward the photo backdrop / player area)
+            coords   = vector4(-811.771, -1373.614, 43.073, 270.0),
         },
         blips = {
             name     = "ID Photo",
