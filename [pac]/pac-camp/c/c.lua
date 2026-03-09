@@ -1,9 +1,8 @@
--- pac-camp  c/c.lua  (client)
--- Based on rs_camp by riversafe. Goth Mommy RP fixes:
---   * Auto ground-snap on placement start
---   * Continuous ground-snap while moving (F re-enables after manual override)
---   * Flatness check on confirm (Config.MaxSlopeAngle)
---   * All net events renamed pac_camp:
+-- pac-camp  c/c.lua  (client)  v2
+-- New in v2:
+--   * /campinvite, /campkick, /campwho chat suggestions
+--   * Bedroll use: sleep animation + send respawn coords to server
+--   * applyRespawn: teleport to bedroll position on spawn
 
 local campsEntities  = {}
 local dynamicDoors   = {}
@@ -46,7 +45,6 @@ local function RaycastFromCamera(distance)
     return nil
 end
 
--- Downward ray to find ground Z and surface normal at (x,y)
 local function GetGroundInfo(x, y, z)
     local ray = StartShapeTestRay(x, y, z+3.0, x, y, z-3.0, 1, -1, 0)
     local _, hit, hitCoords, hitNormal = GetShapeTestResultIncludingMaterial(ray)
@@ -55,7 +53,6 @@ local function GetGroundInfo(x, y, z)
     return gz, vector3(0,0,1)
 end
 
--- Degrees off vertical (0=flat, 90=wall)
 local function GetSlopeAngle(normal)
     if not normal then return 0.0 end
     return math.deg(math.acos(math.max(-1.0, math.min(1.0, normal.z))))
@@ -97,6 +94,9 @@ local function RemVeg(sphere)
     Citizen.InvokeNative(0x9CF1836C03FB67A2, Citizen.PointerValueIntInitialized(sphere), 0)
 end
 
+-- -----------------------------------------------------------------------
+-- Camp spawn / despawn
+-- -----------------------------------------------------------------------
 RegisterNetEvent('pac_camp:client:spawnCamps')
 AddEventHandler('pac_camp:client:spawnCamps', function(data)
     campsData[data.id] = data
@@ -104,15 +104,15 @@ end)
 
 CreateThread(function()
     while true do
-        local ped   = PlayerPedId()
+        local ped     = PlayerPedId()
         local pCoords = GetEntityCoords(ped)
         local activeCamps = {}
         for id, data in pairs(campsData) do
             local pos  = vector3(data.x, data.y, data.z)
             local dist = #(pCoords - pos)
             if dist < renderDistance and not campsEntities[id] then
-                local mHash   = GetHashKey(data.item.model)
-                local isDyn   = false
+                local mHash = GetHashKey(data.item.model)
+                local isDyn = false
                 for _, door in pairs(Config.Doors or {}) do
                     if door.modelDoor == data.item.model then isDyn=true; dynamicDoors[id]=GetHashKey(data.item.model); break end
                 end
@@ -168,6 +168,9 @@ AddEventHandler('pac_camp:client:receiveCamps', function(camps)
     end
 end)
 
+-- -----------------------------------------------------------------------
+-- /camp command  (pickup target mode toggle)
+-- -----------------------------------------------------------------------
 RegisterCommand(Config.Commands.Camp, function()
     targetEnabled = not targetEnabled
     if targetEnabled then
@@ -199,6 +202,9 @@ CreateThread(function()
     end
 end)
 
+-- -----------------------------------------------------------------------
+-- Chest + door proximity prompts
+-- -----------------------------------------------------------------------
 local function updateChestPrompts()
     local pCoords = GetEntityCoords(PlayerPedId())
     closestChestEntity, closestChestId = nil, nil
@@ -269,6 +275,9 @@ AddEventHandler('pac_camp:client:toggleDoor', function(campId)
     end
 end)
 
+-- -----------------------------------------------------------------------
+-- Placement mode
+-- -----------------------------------------------------------------------
 local function GetModelRadius(mHash)
     local mn, mx = GetModelDimensions(mHash)
     if mn and mx then
@@ -286,8 +295,6 @@ AddEventHandler('pac_camp:client:placePropCamp', function(itemName)
 
     local ped = PlayerPedId()
     local ox, oy, oz = table.unpack(GetOffsetFromEntityInWorldCoords(ped, 0.0, 4.0, 0.0))
-
-    -- Auto snap to ground on spawn
     local groundZ = GetGroundInfo(ox, oy, oz)
     if groundZ then oz = groundZ end
 
@@ -301,7 +308,7 @@ AddEventHandler('pac_camp:client:placePropCamp', function(itemName)
     SetModelAsNoLongerNeeded(modelHash)
     PlaceObjectOnGroundProperly(tempObj)
 
-    local snapped   = GetEntityCoords(tempObj, true)
+    local snapped = GetEntityCoords(tempObj, true)
     local posX, posY, posZ = snapped.x, snapped.y, snapped.z
     local rotX, rotY, rotZ = 0.0, 0.0, 0.0
     local posStep   = 0.1
@@ -311,13 +318,6 @@ AddEventHandler('pac_camp:client:placePropCamp', function(itemName)
     local dynRadius = GetModelRadius(modelHash)
     local vegSphere = AddVeg(posX, posY, posZ, dynRadius)
 
-    SendNUIMessage({
-        action   = "showcamp",
-        title    = Config.ControlsPanel.title,
-        controls = Config.ControlsPanel.controls,
-        speed    = Config.Text.SpeedLabel..": "..string.format("%.2f", posStep)
-    })
-
     local function refreshUI()
         SendNUIMessage({
             action   = "showcamp",
@@ -326,6 +326,7 @@ AddEventHandler('pac_camp:client:placePropCamp', function(itemName)
             speed    = Config.Text.SpeedLabel..": "..string.format("%.2f", posStep)
         })
     end
+    refreshUI()
 
     CreateThread(function()
         while isPlacing do
@@ -333,12 +334,10 @@ AddEventHandler('pac_camp:client:placePropCamp', function(itemName)
             for _, k in pairs(Config.Keys) do DisableControlAction(0, k, true) end
 
             local moved = false
-
             if IsDisabledControlJustPressed(0, Config.Keys.moveForward)  then posY=posY+posStep; moved=true end
             if IsDisabledControlJustPressed(0, Config.Keys.moveBackward) then posY=posY-posStep; moved=true end
             if IsDisabledControlJustPressed(0, Config.Keys.moveLeft)     then posX=posX-posStep; moved=true end
             if IsDisabledControlJustPressed(0, Config.Keys.moveRight)    then posX=posX+posStep; moved=true end
-            -- 7/8 override snap so player can raise/lower off ground
             if IsDisabledControlJustPressed(0, Config.Keys.moveUp)   then posZ=posZ+posStep; snapToGround=false; moved=true end
             if IsDisabledControlJustPressed(0, Config.Keys.moveDown) then posZ=posZ-posStep; snapToGround=false; moved=true end
             if IsDisabledControlJustPressed(0, Config.Keys.rotateRightZ) then rotZ=rotZ+rotStep; moved=true end
@@ -347,30 +346,23 @@ AddEventHandler('pac_camp:client:placePropCamp', function(itemName)
             if IsDisabledControlJustPressed(0, Config.Keys.rotateDownX)  then rotX=rotX-rotStep; moved=true end
             if IsDisabledControlJustPressed(0, Config.Keys.rotateRightY) then rotY=rotY+rotStep; moved=true end
             if IsDisabledControlJustPressed(0, Config.Keys.rotateLeftY)  then rotY=rotY-rotStep; moved=true end
-            -- F = manual snap + re-enable continuous
             if IsDisabledControlJustPressed(0, Config.Keys.placeOnGround) then snapToGround=true; moved=true end
-
             if IsDisabledControlJustPressed(0, Config.Keys.increaseSpeed) then
                 posStep=math.min(posStep+0.01, 5.0); rotStep=posStep*10; refreshUI()
             end
             if IsDisabledControlJustPressed(0, Config.Keys.decreaseSpeed) then
                 posStep=math.max(posStep-0.01, 0.01); rotStep=posStep*10; refreshUI()
             end
-
-            -- Continuous ground snap
             if snapToGround then
                 local gz = GetGroundInfo(posX, posY, posZ)
                 if gz then posZ = gz end
             end
-
             if moved then
                 SetEntityCoords(tempObj, posX, posY, posZ, true, true, true, false)
                 SetEntityRotation(tempObj, rotX, rotY, rotZ, 2, true)
                 if vegSphere then RemVeg(vegSphere) end
                 vegSphere = AddVeg(posX, posY, posZ, dynRadius)
             end
-
-            -- CONFIRM
             if IsDisabledControlJustPressed(0, Config.Keys.confirmPlace) then
                 local _, surfNormal = GetGroundInfo(posX, posY, posZ)
                 local slope = GetSlopeAngle(surfNormal)
@@ -386,8 +378,6 @@ AddEventHandler('pac_camp:client:placePropCamp', function(itemName)
                     TriggerEvent("vorp:NotifyLeft", Config.Text.Camp, Config.Text.Place, "generic_textures", "tick", 2000, "COLOR_GREEN")
                 end
             end
-
-            -- CANCEL
             if IsDisabledControlJustPressed(0, Config.Keys.cancelPlace) then
                 isPlacing = false
                 SendNUIMessage({action="hidecamp"})
@@ -399,14 +389,47 @@ AddEventHandler('pac_camp:client:placePropCamp', function(itemName)
     end)
 end)
 
-Citizen.CreateThread(function()
-    TriggerEvent('chat:addSuggestion', '/'..Config.Commands.Shareperms, Config.Text.Shared, {
-        {name=Config.Text.Corret, help=Config.Text.Corret},
-        {name=Config.Text.Sharecorret, help=Config.Text.Playerpermi}
-    })
-    TriggerEvent('chat:addSuggestion', '/'..Config.Commands.Unshareperms, Config.Text.Remove, {
-        {name=Config.Text.Corret, help=Config.Text.Corret}
-    })
+-- -----------------------------------------------------------------------
+-- Bedroll: sleep animation + set respawn
+-- -----------------------------------------------------------------------
+RegisterNetEvent('pac_camp:client:useBedroll')
+AddEventHandler('pac_camp:client:useBedroll', function()
+    local ped    = PlayerPedId()
+    local coords = GetEntityCoords(ped)
+    local heading = GetEntityHeading(ped)
+
+    -- Play sleep animation
+    local dict = "amb_camp@world_human_sleep_ground@male@back@idle_a"
+    RequestAnimDict(dict)
+    local t = 0
+    while not HasAnimDictLoaded(dict) and t < 100 do
+        Wait(50); t = t + 1
+    end
+    if HasAnimDictLoaded(dict) then
+        TaskPlayAnim(ped, dict, "idle_a", 2.0, -2.0, 5000, 1, 0, false, false, false)
+        Wait(5000)
+        StopAnimTask(ped, dict, "idle_a", 2.0)
+    end
+
+    -- Set respawn
+    TriggerServerEvent('pac_camp:server:setBedrollRespawn', {x=coords.x, y=coords.y, z=coords.z, w=heading})
+end)
+
+-- On spawn, server may tell us to teleport to bedroll position
+RegisterNetEvent('pac_camp:client:applyRespawn')
+AddEventHandler('pac_camp:client:applyRespawn', function(coords)
+    Wait(1000)  -- small delay to let character fully spawn in
+    local ped = PlayerPedId()
+    SetEntityCoords(ped, coords.x, coords.y, coords.z, false, false, false, false)
+    SetEntityHeading(ped, coords.w or 0.0)
+end)
+
+-- -----------------------------------------------------------------------
+-- Town check: client sends current town name to server
+-- -----------------------------------------------------------------------
+RegisterNetEvent('pac_camp:client:sendTownToServer')
+AddEventHandler('pac_camp:client:sendTownToServer', function(itemName)
+    TriggerServerEvent('pac_camp:server:checkTownAndPlace', itemName, GetCurrentTownName())
 end)
 
 function GetCurrentTownName()
@@ -424,11 +447,23 @@ function GetCurrentTownName()
     return map[h]
 end
 
-RegisterNetEvent('pac_camp:client:sendTownToServer')
-AddEventHandler('pac_camp:client:sendTownToServer', function(itemName)
-    TriggerServerEvent('pac_camp:server:checkTownAndPlace', itemName, GetCurrentTownName())
+-- -----------------------------------------------------------------------
+-- Chat suggestions
+-- -----------------------------------------------------------------------
+Citizen.CreateThread(function()
+    TriggerEvent('chat:addSuggestion', '/'..Config.Commands.Camp,
+        Config.Text.CampCmdDesc, {})
+    TriggerEvent('chat:addSuggestion', '/'..Config.Commands.CampInvite,
+        Config.Text.InviteDesc, {{name="serverID", help="Server ID of the player to invite"}})
+    TriggerEvent('chat:addSuggestion', '/'..Config.Commands.CampKick,
+        Config.Text.KickDesc, {{name="serverID", help="Server ID of the player to remove"}})
+    TriggerEvent('chat:addSuggestion', '/'..Config.Commands.CampWho,
+        Config.Text.WhoDesc, {})
 end)
 
+-- -----------------------------------------------------------------------
+-- Cleanup on resource stop
+-- -----------------------------------------------------------------------
 AddEventHandler('onResourceStop', function(res)
     if res ~= GetCurrentResourceName() then return end
     for uid, _ in pairs(campsEntities) do
