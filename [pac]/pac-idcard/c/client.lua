@@ -1,12 +1,12 @@
 local idcardData    = false
-local cam           = nil   -- MUST be nil, not 0! 'not 0' is false in Lua
+local cam           = nil   -- nil not 0: in Lua 'not 0' is false!
 local currentCamPos = nil
 local movements     = {}
 local movements2    = {}
 local creating      = false
 local currentFilter = 1
 
--- ─── Prompt setup (camera controls + idcard NPC only) ───────────────────────
+-- ─── Prompt setup ───────────────────────────────────────────────────────────────
 local function createPrompts(keysTable, promptGroup)
     local array = {}
     for _, keyData in ipairs(keysTable) do
@@ -53,20 +53,23 @@ end)
 
 local function ctrl(key) return Config.Keybinds[key][2] end
 
--- ─── DrawText3D helper ─────────────────────────────────────────────────────────
+-- ─── DrawText3D (RDR3-compatible) ──────────────────────────────────────────────────
+-- RDR3 uses GetHudScreenPositionFromWorldPosition, not World3dToScreen2d
 local function DrawText3D(x, y, z, text)
-    local onScreen, screenX, screenY = World3dToScreen2d(x, y, z)
-    if not onScreen then return end
-    SetTextScale(0.35, 0.35)
-    SetTextFont(4)
+    local screenX, screenY = 0.0, 0.0
+    -- RDR3 native: returns screenX, screenY from world coords
+    screenX, screenY = Citizen.InvokeNative(0x34E82B6AA0590DE3, x, y, z, screenX, screenY)
+    if not screenX or screenX == 0.0 then return end
+    SetTextScale(0.0, 0.30)
+    SetTextFont(0)
     SetTextProportional(1)
     SetTextColour(255, 255, 255, 215)
+    SetTextDropShadow()
+    SetTextEdge(4, 0, 0, 0, 255)
     SetTextEntry('STRING')
     SetTextCentre(true)
     AddTextComponentString(text)
-    DrawText(screenX, screenY)
-    local factor = #text / 370
-    DrawRect(screenX, screenY + 0.0125, 0.015 + factor, 0.03, 0, 0, 0, 75)
+    DrawText(screenX, screenY - 0.03)
 end
 
 -- ─── NUI Callbacks ────────────────────────────────────────────────────────────
@@ -257,7 +260,8 @@ local function spawnPhotographerPed(key, v)
             break
         end
     end
-    local ped = CreatePed(hash, coords.x, coords.y, coords.z - 1, coords.w, false, 0)
+    -- Spawn at exact Z (no -1 offset) so the NPC stands on the floor properly
+    local ped = CreatePed(hash, coords.x, coords.y, coords.z, coords.w, false, 0)
     if not DoesEntityExist(ped) then
         print("[pac-idcard] ERROR: Failed to create photographer ped for " .. key)
         return
@@ -270,11 +274,12 @@ local function spawnPhotographerPed(key, v)
     Citizen.InvokeNative(0xD8B8CFD709214ACD, ped, true)
     SetModelAsNoLongerNeeded(hash)
     SetEntityAsMissionEntity(ped, true, true)
-    -- WORLD_HUMAN_HANG_OUT_STREET: verified upright standing idle in RDR3
-    local animScenario = npc.anim or "WORLD_HUMAN_HANG_OUT_STREET"
-    TaskStartScenarioInPlace(ped, GetHashKey(animScenario), 0, true, false, false, false)
+    -- No scenario: let default idle animation play (standing)
+    -- Scenarios in RDR3 often crouch/sit unexpectedly depending on surface detection
+    -- ClearPedTasks ensures clean idle state
+    ClearPedTasks(ped)
     photographerPeds[key] = ped
-    print("[pac-idcard] Spawned photographer '" .. key .. "' ped=" .. ped .. " anim=" .. animScenario)
+    print("[pac-idcard] Spawned photographer '" .. key .. "' ped=" .. ped .. " (no scenario, clean idle)")
 end
 
 Citizen.CreateThread(function()
@@ -334,7 +339,7 @@ Citizen.CreateThread(function()
                     sleep = 0
 
                     local priceStr = Config.Prices.printphoto and (" ($" .. Config.Prices.printphoto .. ")") or ""
-                    DrawText3D(pedPos.x, pedPos.y, pedPos.z + 1.15,
+                    DrawText3D(pedPos.x, pedPos.y, pedPos.z + 1.0,
                         "[E] Take Photo  |  [Enter] Print Photo" .. priceStr)
 
                     if IsDisabledControlJustPressed(0, ctrl("takeidcard")) then
@@ -354,30 +359,21 @@ Citizen.CreateThread(function()
     end
 end)
 
--- ─── DEBUG: /phototest command ─────────────────────────────────────────────────────
+-- ─── DEBUG: /phototest ───────────────────────────────────────────────────────────
 RegisterCommand("phototest", function()
     local myCoords = GetEntityCoords(PlayerPedId())
-    print(string.format("[phototest] Player coords: x=%.2f y=%.2f z=%.2f",
-        myCoords.x, myCoords.y, myCoords.z))
-    print(string.format("[phototest] cam=%s (nil=ready for interaction)", tostring(cam)))
+    print(string.format("[phototest] Player: x=%.2f y=%.2f z=%.2f  cam=%s",
+        myCoords.x, myCoords.y, myCoords.z, tostring(cam)))
     for k, v in pairs(Config.Photographers) do
         local ped = photographerPeds[k]
-        if ped then
-            if DoesEntityExist(ped) then
-                local pedCoords = GetEntityCoords(ped)
-                local dist = #(myCoords - pedCoords)
-                print(string.format("[phototest] '%s' ped=%d EXISTS at x=%.2f y=%.2f z=%.2f dist=%.2f (TalkDist=%.1f)",
-                    k, ped, pedCoords.x, pedCoords.y, pedCoords.z, dist, Config.TalkDistance))
-                if dist < Config.TalkDistance then
-                    print("[phototest] -> IN RANGE: interaction should be active")
-                else
-                    print("[phototest] -> OUT OF RANGE: get closer")
-                end
-            else
-                print("[phototest] '" .. k .. "' ped=" .. ped .. " DoesEntityExist=FALSE (stale handle)")
-            end
+        if ped and DoesEntityExist(ped) then
+            local p = GetEntityCoords(ped)
+            local dist = #(myCoords - p)
+            print(string.format("[phototest] '%s' ped=%d at x=%.2f y=%.2f z=%.2f dist=%.2f %s",
+                k, ped, p.x, p.y, p.z, dist,
+                dist < Config.TalkDistance and "IN RANGE" or "out of range"))
         else
-            print("[phototest] '" .. k .. "' NOT SPAWNED")
+            print("[phototest] '" .. k .. "' NOT SPAWNED or stale")
         end
     end
 end, false)
