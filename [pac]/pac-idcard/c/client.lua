@@ -7,14 +7,14 @@ local creating      = false
 local currentFilter = 1
 
 -- ─── Prompt setup ──────────────────────────────────────────────────────────
--- Config.Keybinds[key] = { promptHash, controlID }
--- promptHash  -> used by PromptSetControlAction (HUD key label)
--- controlID   -> used by IsControlJustPressed / IsControlPressed (actual input)
+-- Config.Keybinds[key] = { inputName, controlID }
+-- inputName  -> GetHashKey(inputName) passed to PromptSetControlAction for correct HUD icon
+-- controlID  -> used by IsDisabledControlPressed (actual input)
 local function createPrompts(keysTable, promptGroup)
     local array = {}
     for _, keyData in ipairs(keysTable) do
         local m = PromptRegisterBegin()
-        PromptSetControlAction(m, keyData[2][1])   -- [1] = prompt hash
+        PromptSetControlAction(m, GetHashKey(keyData[2][1]))  -- [1] = INPUT_* name string
         PromptSetText(m, CreateVarString(10, 'LITERAL_STRING', keyData[1]))
         PromptSetEnabled(m, 1)
         PromptSetVisible(m, 1)
@@ -51,14 +51,13 @@ local keysTable2 = {
     { Locale("takeidcard"), Config.Keybinds["takeidcard"] },
 }
 
--- Wait a half second so game is fully loaded before registering prompts
 Citizen.CreateThread(function()
-    Citizen.Wait(500)
+    Citizen.Wait(10)
     movements  = createPrompts(keysTable1, promptGroup1)
     movements2 = createPrompts(keysTable2, promptGroup2)
 end)
 
--- Helper: get the controlID (integer, index [2]) from a keybind entry
+-- Helper: get just the controlID (index [2]) from a keybind entry
 local function ctrl(key) return Config.Keybinds[key][2] end
 
 -- ─── NUI Callbacks ──────────────────────────────────────────────────────────
@@ -133,6 +132,8 @@ function GetClosestPlayer()
 end
 
 local function setActivePrompts(mode)
+    -- photo mode: show takephoto(1) + printphoto(2)
+    -- camera mode: show exit(3) + all movement/filter (4-11)
     local show = mode == "photo"
         and {true,true,false,false,false,false,false,false,false,false,false}
         or  {false,false,true,true,true,true,true,true,true,true,true}
@@ -157,34 +158,26 @@ local function cycleFilter(dir)
     if currentFilter < 1 then currentFilter = n end
     if currentFilter > n then currentFilter = 1 end
     applyFilter(currentFilter)
-    Citizen.SetTimeout(300, function() filterCooldown = false end)
+    Citizen.SetTimeout(250, function() filterCooldown = false end)
 end
 
--- Move camera by offsetting coords relative to camera heading (RDR3 compatible)
-local function moveCam(dx, dy, dz)
-    if not cam or cam == 0 then return end
-    local cx, cy, cz = GetCamCoord(cam)
-    local rot = GetCamRot(cam, 2)
-    local rad = math.rad(rot[3])  -- yaw/heading
-    local nx = cx + (dx * math.cos(rad) - dy * math.sin(rad))
-    local ny = cy + (dx * math.sin(rad) + dy * math.cos(rad))
-    local nz = cz + dz
-    local playerPos = GetEntityCoords(PlayerPedId())
-    if #(vector3(nx, ny, nz) - playerPos) < 8.0 then
-        SetCamCoord(cam, nx, ny, nz)
+local function moveCam(x, y, z)
+    currentCamPos = GetOffsetFromCoordAndHeadingInWorldCoords(
+        currentCamPos.x, currentCamPos.y, currentCamPos.z, currentCamPos.w, x, y, z)
+    if #(GetEntityCoords(PlayerPedId()) - currentCamPos) < 1.5 then
+        SetCamCoord(cam, currentCamPos.x, currentCamPos.y, currentCamPos.z)
     end
 end
 
--- ─── Exit camera (used from loop and cleanup) ─────────────────────────────
+-- ─── Camera exit helper — call from any exit path ──────────────────────────
 local function exitCamera()
     SendNUIMessage({ action = 'showCameraOverlay', visible = false })
     RenderScriptCams(false, false, 0, true, true)
-    if cam and cam ~= 0 then
-        DestroyCam(cam, true)
-    end
+    if cam then DestroyCam(cam, true) end
     cam = nil
     SetPlayerControl(PlayerId(), true)
     FreezeEntityPosition(PlayerPedId(), false)
+    SetNuiFocus(false, false)
     TriggerServerEvent('fx-idcard:server:setBucket', 0)
     Config.ShowHud()
 end
@@ -199,14 +192,13 @@ local function takePhoto(v)
     SetEntityHeading(ped, v.pedCoords.w)
     FreezeEntityPosition(ped, true)
     SetPlayerControl(PlayerId(), false)
-
     cam = CreateCam("DEFAULT_SCRIPTED_CAMERA", true)
-    SetCamCoord(cam, v.camCoords.x, v.camCoords.y, v.camCoords.z)
-    SetCamRot(cam, 0, 0, v.camCoords.w, 2)
+    currentCamPos = v.camCoords
+    SetCamCoord(cam, currentCamPos.x, currentCamPos.y, currentCamPos.z)
+    SetCamRot(cam, 0, 0, currentCamPos.w, 2)
     Citizen.InvokeNative(0x27666E5988D9D429, cam, v.camFov)
     SetCamActive(cam, true)
     RenderScriptCams(true, false, 0, true, true)
-
     Wait(1000)
     DoScreenFadeIn(1000)
 
@@ -214,48 +206,24 @@ local function takePhoto(v)
     applyFilter(currentFilter)
     SendNUIMessage({ action = 'showCameraOverlay', visible = true })
 
-    local startTime = GetGameTimer()
-
     Citizen.CreateThread(function()
         while cam do
-            -- FIX: was 'prompts' (undefined nil) — correct variable is promptGroup1
-            if #movements > 0 then
-                PromptSetActiveGroupThisFrame(promptGroup1, CreateVarString(10, 'LITERAL_STRING', "Photographer"))
-                setActivePrompts("camera")
-            end
+            PromptSetActiveGroupThisFrame(promptGroup1, CreateVarString(10,'LITERAL_STRING',"Photographer"))
+            setActivePrompts("camera")
 
-            -- Use both IsControlJustPressed and IsDisabledControlJustPressed for exit
-            -- to catch it whether or not game input is disabled by camera
-            if IsControlJustPressed(0, ctrl("exit")) or IsDisabledControlJustPressed(0, ctrl("exit")) then
+            if IsDisabledControlPressed(0, ctrl("exit")) then
                 exitCamera()
-                return
-
-            elseif IsControlPressed(0, ctrl("camForward")) or IsDisabledControlPressed(0, ctrl("camForward")) then
-                moveCam(0.05, 0, 0)
-            elseif IsControlPressed(0, ctrl("camBack")) or IsDisabledControlPressed(0, ctrl("camBack")) then
-                moveCam(-0.05, 0, 0)
-            elseif IsControlPressed(0, ctrl("camUp")) or IsDisabledControlPressed(0, ctrl("camUp")) then
-                moveCam(0, 0, 0.05)
-            elseif IsControlPressed(0, ctrl("camDown")) or IsDisabledControlPressed(0, ctrl("camDown")) then
-                moveCam(0, 0, -0.05)
-            elseif IsControlPressed(0, ctrl("camLeft")) or IsDisabledControlPressed(0, ctrl("camLeft")) then
-                moveCam(0, -0.05, 0)
-            elseif IsControlPressed(0, ctrl("camRight")) or IsDisabledControlPressed(0, ctrl("camRight")) then
-                moveCam(0, 0.05, 0)
-
-            elseif IsControlJustPressed(0, ctrl("filterNext")) or IsDisabledControlJustPressed(0, ctrl("filterNext")) then
-                cycleFilter(1)
-            elseif IsControlJustPressed(0, ctrl("filterPrev")) or IsDisabledControlJustPressed(0, ctrl("filterPrev")) then
-                cycleFilter(-1)
+                break
+            elseif IsDisabledControlPressed(0, ctrl("camUp"))      then moveCam(0, 0,  0.01)
+            elseif IsDisabledControlPressed(0, ctrl("camDown"))    then moveCam(0, 0, -0.01)
+            elseif IsDisabledControlPressed(0, ctrl("camLeft"))    then moveCam(0, -0.01, 0)
+            elseif IsDisabledControlPressed(0, ctrl("camRight"))   then moveCam(0,  0.01, 0)
+            elseif IsDisabledControlPressed(0, ctrl("camForward")) then moveCam(-0.01, 0, 0)
+            elseif IsDisabledControlPressed(0, ctrl("camBack"))    then moveCam( 0.01, 0, 0)
+            elseif IsDisabledControlJustPressed(0, ctrl("filterNext")) then cycleFilter(1)
+            elseif IsDisabledControlJustPressed(0, ctrl("filterPrev")) then cycleFilter(-1)
             end
-
-            -- Safety: auto-exit after 5 minutes if somehow stuck
-            if GetGameTimer() - startTime > 300000 then
-                exitCamera()
-                return
-            end
-
-            Wait(0)
+            Wait(1)
         end
     end)
 end
@@ -388,7 +356,7 @@ Citizen.CreateThread(function()
                 if Config.Prices.idcard and not v.illegal then
                     label = label.." $"..Config.Prices.idcard
                 elseif v.illegal and Config.Prices.illegal then
-                    label = Locale("promptitle3")..", $"..Config.Prices.illegal
+                    label = Locale("promptitle3").." $"..Config.Prices.illegal
                 end
                 PromptSetActiveGroupThisFrame(promptGroup2, CreateVarString(10,'LITERAL_STRING',label))
                 if PromptHasHoldModeCompleted(movements2[1]) then
@@ -420,5 +388,8 @@ AddEventHandler('onResourceStop', function(resourceName)
         if v.blipEntity then RemoveBlip(v.blipEntity) end
     end
     if cam then exitCamera() end
-    if creating then AnimpostfxStop("OJDominoBlur") end
+    if creating then
+        AnimpostfxStop("OJDominoBlur")
+        SetNuiFocus(false, false)
+    end
 end)

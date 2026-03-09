@@ -6,29 +6,40 @@ Config.TakeCardType = "sql" -- "item" or "sql" — sql = one unique ID per playe
 
 -- ─── Keybinds ──────────────────────────────────────────────────────────────────
 -- Each keybind has TWO values:
---   [1] = PromptControlHash  used by PromptSetControlAction (shows key name in HUD prompts)
---   [2] = RDR3 Control ID    used by IsDisabledControlPressed (actual input detection)
+--   [1] = INPUT_* name string  — passed to GetHashKey() in createPrompts for correct HUD icon
+--   [2] = RDR3 Control ID      — used by IsDisabledControlPressed (actual input detection)
 --
--- These are DIFFERENT systems in RDR3. Prompts use hashes; input detection uses integer IDs.
+-- These are DIFFERENT systems in RDR3.
+-- The INPUT_* name drives the icon displayed in the prompt widget.
+-- The integer control ID drives the actual keypress detection.
 --
--- RDR3 Control IDs (verified):
---   Up Arrow=172  Down Arrow=173  Left Arrow=174  Right Arrow=175
---   Page Up=10    Page Down=11    (fallback zoom if +/- don't register)
---   G=47   Backspace=177   Enter=18
+-- Verified INPUT_* names → keys:
+--   INPUT_FRONTEND_UP      = Up Arrow
+--   INPUT_FRONTEND_DOWN    = Down Arrow
+--   INPUT_FRONTEND_LEFT    = Left Arrow
+--   INPUT_FRONTEND_RIGHT   = Right Arrow
+--   INPUT_FRONTEND_CANCEL  = Backspace
+--   INPUT_FRONTEND_ACCEPT  = Enter
+--   INPUT_FRONTEND_OPTION  = G  ("interact with animal" default)
+--   INPUT_FRONTEND_ENDSCREEN_ACCEPT = Page Up
+--   INPUT_FRONTEND_SOCIAL_CLUB      = Page Down
+--   INPUT_SELECT_QUICKSELECT_SIDEARMS_LEFT  = [ (control 74)
+--   INPUT_SELECT_QUICKSELECT_SIDEARMS_RIGHT = ] (control 75)
+--   INPUT_CONTEXT_Y = E
 Config.Keybinds = {
-    --              PromptHash    ControlID
-    ["takephoto"]  = { 0x760A9C6F,  47  },  -- G
-    ["exit"]       = { 0x156F7119,  177 },  -- Backspace
-    ["camUp"]      = { 0x05CA7C52,  172 },  -- Up Arrow
-    ["camDown"]    = { 0xF5F8B500,  173 },  -- Down Arrow
-    ["camLeft"]    = { 0xA65EBAB4,  174 },  -- Left Arrow
-    ["camRight"]   = { 0xDEB34313,  175 },  -- Right Arrow
-    ["camForward"] = { 0x446258B6,  10  },  -- Page Up   (zoom in)
-    ["camBack"]    = { 0x3C3DD371,  11  },  -- Page Down (zoom out)
-    ["printphoto"] = { 0xC7B5340A,  18  },  -- Enter
-    ["filterPrev"] = { 0x62800C92,  74  },  -- [ (filter prev)
-    ["filterNext"] = { 0x8BDE7443,  75  },  -- ] (filter next)
-    ["takeidcard"] = { 0x2CD5343E,  51  },  -- E
+    --               INPUT_* name (for prompt icon)              ControlID (for input detection)
+    ["takephoto"]  = { "INPUT_FRONTEND_OPTION",                  47  },  -- G
+    ["exit"]       = { "INPUT_FRONTEND_CANCEL",                  177 },  -- Backspace
+    ["camUp"]      = { "INPUT_FRONTEND_UP",                      172 },  -- Up Arrow
+    ["camDown"]    = { "INPUT_FRONTEND_DOWN",                    173 },  -- Down Arrow
+    ["camLeft"]    = { "INPUT_FRONTEND_LEFT",                    174 },  -- Left Arrow
+    ["camRight"]   = { "INPUT_FRONTEND_RIGHT",                   175 },  -- Right Arrow
+    ["camForward"] = { "INPUT_FRONTEND_ENDSCREEN_ACCEPT",        10  },  -- Page Up
+    ["camBack"]    = { "INPUT_FRONTEND_SOCIAL_CLUB",             11  },  -- Page Down
+    ["printphoto"] = { "INPUT_FRONTEND_ACCEPT",                  18  },  -- Enter
+    ["filterPrev"] = { "INPUT_SELECT_QUICKSELECT_SIDEARMS_LEFT", 74  },  -- [
+    ["filterNext"] = { "INPUT_SELECT_QUICKSELECT_SIDEARMS_RIGHT",75  },  -- ]
+    ["takeidcard"] = { "INPUT_CONTEXT_Y",                        51  },  -- E
 }
 
 Config.Locale = {
@@ -91,7 +102,7 @@ Config.ShowDistance            = 1.5
 Config.Photographers = {
     ["Blackwater"] = {
         promptCoords   = vector4(-810.48, -1372.56, 43.02, 104.9485),
-        promptDistance = 2,
+        promptDistance = 5,   -- increased from 2 so players trigger it further inside
         pedCoords      = vector4(-810.48, -1372.56, 43.02, 285.0),
         camCoords      = vector4(-814.40, -1374.85, 44.90, 86.48),
         camFov         = 60.0,
@@ -103,7 +114,7 @@ Config.Photographers = {
         },
         blips = {
             name     = "ID Photo",
-            sprite   = 0x935EE440,  -- Stranger icon (person silhouette, RDR2 service NPC standard)
+            sprite   = 0xB0E5E617,  -- SaddleBag icon — period-appropriate for a traveling photographer
             scale    = 0.6,
             modifier = "BLIP_MODIFIER_MP_COLOR_32",
             coords   = vector3(-810.48, -1372.56, 43.02),
