@@ -1,3 +1,0 @@
--- MOVED: this file is no longer used.
--- Server code lives at:  [pac]/pac-camp/s/s.lua
--- fxmanifest.lua references s/s.lua
