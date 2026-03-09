@@ -2,27 +2,25 @@ Config = {}
 Config.Language = "en"
 Config.LicensePrefix = "GMRP"
 Config.ShowIdcardCommand = "idcard"
-Config.TakeCardType = "sql" -- "item" or "sql" — sql = one unique ID per player
+Config.TakeCardType = "sql"
 
--- ─── Keybinds ──────────────────────────────────────────────────────────────────
 Config.Keybinds = {
-    ["takephoto"]  = { "INPUT_FRONTEND_OPTION",                  47  },  -- G
-    ["exit"]       = { "INPUT_FRONTEND_CANCEL",                  177 },  -- Backspace
-    ["camUp"]      = { "INPUT_FRONTEND_UP",                      172 },  -- Up Arrow
-    ["camDown"]    = { "INPUT_FRONTEND_DOWN",                    173 },  -- Down Arrow
-    ["camLeft"]    = { "INPUT_FRONTEND_LEFT",                    174 },  -- Left Arrow
-    ["camRight"]   = { "INPUT_FRONTEND_RIGHT",                   175 },  -- Right Arrow
-    ["camForward"] = { "INPUT_FRONTEND_ENDSCREEN_ACCEPT",        10  },  -- Page Up
-    ["camBack"]    = { "INPUT_FRONTEND_SOCIAL_CLUB",             11  },  -- Page Down
-    ["printphoto"] = { "INPUT_FRONTEND_ACCEPT",                  18  },  -- Enter
-    ["filterPrev"] = { "INPUT_SELECT_QUICKSELECT_SIDEARMS_LEFT", 74  },  -- [
-    ["filterNext"] = { "INPUT_SELECT_QUICKSELECT_SIDEARMS_RIGHT",75  },  -- ]
-    ["takeidcard"] = { "INPUT_CONTEXT_Y",                        51  },  -- E
+    ["takephoto"]  = { "INPUT_FRONTEND_OPTION",                  47  },
+    ["exit"]       = { "INPUT_FRONTEND_CANCEL",                  177 },
+    ["camUp"]      = { "INPUT_FRONTEND_UP",                      172 },
+    ["camDown"]    = { "INPUT_FRONTEND_DOWN",                    173 },
+    ["camLeft"]    = { "INPUT_FRONTEND_LEFT",                    174 },
+    ["camRight"]   = { "INPUT_FRONTEND_RIGHT",                   175 },
+    ["camForward"] = { "INPUT_FRONTEND_ENDSCREEN_ACCEPT",        10  },
+    ["camBack"]    = { "INPUT_FRONTEND_SOCIAL_CLUB",             11  },
+    ["printphoto"] = { "INPUT_FRONTEND_ACCEPT",                  18  },
+    ["filterPrev"] = { "INPUT_SELECT_QUICKSELECT_SIDEARMS_LEFT", 74  },
+    ["filterNext"] = { "INPUT_SELECT_QUICKSELECT_SIDEARMS_RIGHT",75  },
+    ["takeidcard"] = { "INPUT_CONTEXT_Y",                        51  },
 }
 
 Config.Locale = {
     ["en"] = {
-        --- PROMPTS ---
         ["promptitle"]  = "Photographer",
         ["promptitle2"] = "Id Card System",
         ["takephoto"]   = "Take Photo  [G]",
@@ -39,7 +37,6 @@ Config.Locale = {
         ["promptitle3"] = "Illegal Identity Card",
         ["takeidcard"]  = "Take Id Card",
         ["talkphoto"]   = "Talk to Photographer [E]",
-        --- NOTIFY -----
         ["noimg"]          = "No picture ~COLOR_YELLOW~link~COLOR_WHITE~ entered !",
         ["successprint"]   = "The photo has been added to your inventory, you can view it with a ~COLOR_YELLOW~double click",
         ["addIdCard"]      = "The id card has been added to your inventory, you can view it with a ~COLOR_YELLOW~double click",
@@ -80,8 +77,9 @@ Config.ShowDistance            = 1.5
 
 Config.Photographers = {
     ["Blackwater"] = {
-        promptCoords   = vector4(-810.48, -1372.56, 43.02, 104.9485),
+        promptCoords   = vector4(-810.48, -1372.56, 43.02, 180.0),
         promptDistance = 3.5,
+        -- pedCoords: where YOUR ped stands for the photo
         pedCoords      = vector4(-810.48, -1372.56, 43.02, 285.0),
         camCoords      = vector4(-814.40, -1374.85, 44.90, 86.48),
         camFov         = 60.0,
@@ -89,10 +87,8 @@ Config.Photographers = {
             model    = "mp_re_photography_females_01",
             hash     = 0x5730F05E,
             fallback = "cs_brontesbutler",
-            -- heading: ~200 faces her toward the door/player coming in
-            coords   = vector4(-810.48, -1372.56, 43.02, 200.0),
-            -- PROP_HUMAN_STAND_IMPATIENT is the verified RDR3 standing idle scenario
-            anim     = "PROP_HUMAN_STAND_IMPATIENT",
+            coords   = vector4(-810.48, -1372.56, 43.02, 180.0),  -- face south toward door/player
+            anim     = "WORLD_HUMAN_STAND_MOBILE",  -- verified RDR3 standing idle
         },
         blips = {
             name     = "ID Photo",
@@ -134,7 +130,7 @@ Config.IDCardNPC = {
             modifier = "BLIP_MODIFIER_MP_COLOR_32",
         },
         anims = {
-            dict = "PROP_HUMAN_STAND_IMPATIENT",
+            dict = "WORLD_HUMAN_STAND_MOBILE",
             name = false,
         },
         timeSettings = {
@@ -150,7 +146,7 @@ Config.IDCardNPC = {
         models       = "cs_brontesbutler",
         distance     = 2,
         blips        = false,
-        anims        = { dict = "PROP_HUMAN_STAND_IMPATIENT", name = false },
+        anims        = { dict = "WORLD_HUMAN_STAND_MOBILE", name = false },
         timeSettings = false,
     },
 }
