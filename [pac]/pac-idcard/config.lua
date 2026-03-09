@@ -76,33 +76,26 @@ Config.WomanIdCardItem         = "woman_idcard"
 Config.ShowDistance            = 1.5
 
 --[[
-  COORDS - confirmed from live /phototest measurements
+  CONFIRMED COORDS from live /phototest walks
 
-  NPC floor z confirmed = 44.073 (player stood there in first person)
-  BUT CreatePed in this building adds +1 to z (navmesh behaviour).
-  So we set npc coords.z = 43.073 and it will snap to 44.073.
+  NPC floor = 44.073 (CreatePed adds +1, so config z = 43.073)
+  RDR entity heading: 0=North  90=West  180=South  270=East
 
-  Player heading:
-    RDR entity heading: 0=North, 90=West, 180=South, 270=East
-    Camera is East of player (higher X), so player must face heading=270 (East)
-    heading=90 was showing the player's BACK to camera - that was wrong.
+  NPC default (idle by cash register): heading=270 = faces East (toward door)
+  NPC photoHeading (during photo):     heading=90  = faces West (toward player at x=-814)
 
-  Camera:
-    Placed at player-measured position x=-812.721, y=-1375.099, z=44.973
-    PointCamAtCoord aims at player chest on startup only.
-    Arrow keys then nudge cam position freely - NOT re-locked each frame.
+  Player pose: heading=270 = faces East (toward camera at x=-812)
+  Camera: PointCamAtCoord aims at player chest at startup; arrow keys nudge freely.
 ]]
 Config.Photographers = {
     ["Blackwater"] = {
         promptCoords   = vector4(-812.00, -1373.50, 44.07, 180.0),
         promptDistance = 3.5,
 
-        -- Player stands here: confirmed from phototest
-        -- heading=270 = faces East = toward camera (camera is at higher X)
+        -- Player stands here during photo (confirmed from /phototest)
         pedCoords = vector4(-814.981, -1375.036, 44.278, 270.0),
 
-        -- Camera position: confirmed from phototest
-        -- PointCamAtCoord will aim it at the player on start
+        -- Camera position (confirmed from /phototest)
         camCoords = vector4(-812.721, -1375.099, 44.973, 0.0),
         camFov    = 45.0,
 
@@ -110,9 +103,12 @@ Config.Photographers = {
             model    = "mp_re_photography_females_01",
             hash     = 0x5730F05E,
             fallback = "cs_brontesbutler",
-            -- z=43.073: CreatePed adds +1 in this building, so it will snap to 44.073
-            -- heading=270: faces East (toward the photo backdrop / player area)
-            coords   = vector4(-811.771, -1373.614, 43.073, 270.0),
+            -- z=43.073: CreatePed snaps +1 to 44.073 in this building
+            -- coords.w = default idle heading = 270 (faces East, toward cash register / door)
+            coords      = vector4(-811.771, -1373.614, 43.073, 270.0),
+            -- photoHeading = heading used DURING photo session
+            -- 90 = faces West = faces the player standing at x=-814
+            photoHeading = 90.0,
         },
         blips = {
             name     = "ID Photo",
