@@ -1,4 +1,4 @@
-local Locale = {}
+Locale = {}
 
 function _U(str, ...)
     if Locale[Config.Locale] and Locale[Config.Locale][str] then

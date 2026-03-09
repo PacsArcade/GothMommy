@@ -100,45 +100,45 @@
             isolation: isolate;
         }
 
-        /* Screenshot prompt shown after countdown */
+        /* Screenshot prompt - bottom-right corner, unobtrusive */
         #cam-screenshot-prompt {
             display: none;
             position: absolute;
-            top: 50%; left: 50%;
-            transform: translate(-50%, -50%);
-            background: rgba(10,6,2,.90);
-            border: 2px solid rgba(139,105,20,.8);
-            border-radius: 10px;
-            padding: 28px 40px;
+            bottom: 100px;
+            right: 28px;
+            background: rgba(10,6,2,.75);
+            border: 1px solid rgba(139,105,20,.6);
+            border-radius: 8px;
+            padding: 12px 18px;
             text-align: center;
             pointer-events: none;
             isolation: isolate;
             z-index: 10001;
+            opacity: 0.82;
         }
         #cam-screenshot-prompt .ssp-title {
             font-family: 'Georgia', serif;
-            font-size: 22px;
-            color: #d4a843;
-            letter-spacing: 2px;
-            text-shadow: 0 0 12px rgba(212,168,67,.6);
-            margin-bottom: 10px;
+            font-size: 13px;
+            color: #c8a96e;
+            letter-spacing: 1px;
+            margin-bottom: 5px;
         }
         #cam-screenshot-prompt .ssp-key {
             font-family: 'Georgia', serif;
-            font-size: 32px;
+            font-size: 20px;
             color: #f0e0b0;
             background: rgba(30,18,5,.95);
             border: 1px solid #8b6914;
-            border-radius: 6px;
-            padding: 8px 24px;
+            border-radius: 4px;
+            padding: 4px 14px;
             display: inline-block;
-            margin: 8px 0 12px;
-            letter-spacing: 4px;
+            margin: 4px 0 6px;
+            letter-spacing: 3px;
         }
         #cam-screenshot-prompt .ssp-sub {
             font-family: 'Georgia', serif;
-            font-size: 13px;
-            color: #c8a96e;
+            font-size: 10px;
+            color: #8b6914;
             letter-spacing: 1px;
         }
 
@@ -178,7 +178,7 @@
     <div id="cam-screenshot-prompt">
         <div class="ssp-title">Take Your Screenshot</div>
         <div class="ssp-key">F12</div>
-        <div class="ssp-sub">Press any key when done to continue</div>
+        <div class="ssp-sub">Press any key when done</div>
     </div>
     <div id="filter-bar">
         <span class="filter-key">NUM 1</span>
