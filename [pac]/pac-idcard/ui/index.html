@@ -33,6 +33,18 @@
             .create h1, .create h2 {
                 color: #d4a843 !important;
             }
+            /* Fix: push name input down so it doesn't overlap the label */
+            .name-cont {
+                display: flex;
+                flex-direction: column;
+                gap: 6px;
+            }
+            .name-cont .label {
+                margin-bottom: 2px;
+            }
+            .name-cont input#name {
+                margin-top: 4px;
+            }
         </style>
     </head>
 <body>
@@ -179,7 +191,7 @@
         <span class="license">NODATA</span>
         <span class="name">NODATA</span>
         <div class="server-logo"></div>
-        <div class="country">U.S.A</div>
+        <div class="country">Goth Mommy RP</div>
         <div class="card-zone">NODATA</div>
     </div>
 </body>

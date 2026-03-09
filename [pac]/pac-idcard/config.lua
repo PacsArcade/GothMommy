@@ -76,54 +76,40 @@ Config.WomanIdCardItem         = "woman_idcard"
 Config.ShowDistance            = 1.5
 
 --[[
-  BLACKWATER PHOTOGRAPHY STUDIO - COORDINATE MAP
-  Room runs roughly east(-813) <-> west(-807) along X axis
-  Y is constant ~-1372.56, Z floor = ~44.07
+  BLACKWATER STUDIO COORDS  (confirmed from /phototest: floor z=45.07)
 
-  [BACK WALL]  x=-807  <-- subject stands here, faces EAST (heading=90)
-  [TRIPOD]     x=-813  <-- camera tripod prop is here
-  [NPC]        x=-813  <-- stands beside tripod, faces WEST toward subject (heading=90 in RDR = faces west... wait)
+  RDR heading:  0=North  90=West  180=South  270=East
 
-  RDR HEADING NOTE:
-    0   = North (+Y direction)
-    90  = West  (-X direction)  <-- faces toward back wall from tripod side
-    180 = South (-Y direction)
-    270 = East  (+X direction)  <-- faces toward door/tripod from back wall
-
-  So:
-    Subject  at x=-807.5, heading=270 (faces east, toward camera)
-    NPC/cam  at x=-813.0, heading=90  (faces west, toward subject/back wall)
+  NPC  x=-812.5  heading=90   => faces WEST toward back wall
+  Pose x=-807.5  heading=270  => player faces EAST toward camera
+  Cam  x=-814.0              => behind tripod, looks east at subject
 ]]
-
 Config.Photographers = {
     ["Blackwater"] = {
-        promptCoords   = vector4(-810.48, -1372.56, 44.07, 180.0),
+        promptCoords   = vector4(-810.48, -1372.56, 45.07, 180.0),
         promptDistance = 3.5,
 
-        -- Player is placed HERE when photo session starts
-        -- x=-807.5 = back wall area, heading=270 = faces east toward camera
-        pedCoords = vector4(-807.50, -1372.56, 44.07, 270.0),
+        -- Player pose spot: back wall, facing east (toward camera)
+        pedCoords = vector4(-807.50, -1372.56, 45.07, 270.0),
 
-        -- Scripted camera sits near the tripod, points west at subject
-        -- w component unused (we use PointCamAtCoord instead)
-        camCoords = vector4(-813.50, -1372.56, 44.80, 0.0),
+        -- Camera sits behind tripod.
+        -- Original working rotation: pitch=0, roll=0, yaw=90 (faces west)
+        camCoords = vector4(-814.00, -1372.56, 45.70, 90.0),
         camFov    = 50.0,
 
         npc = {
             model    = "mp_re_photography_females_01",
             hash     = 0x5730F05E,
             fallback = "cs_brontesbutler",
-            -- x=-812.5 = beside tripod
-            -- z=44.07  = exact floor level (from /phototest player z)
-            -- heading=90 = faces WEST toward back wall / subject
-            coords   = vector4(-812.50, -1372.56, 44.07, 90.0),
+            -- floor z=45.07, heading=90 => faces west toward subject
+            coords   = vector4(-812.50, -1372.56, 45.07, 90.0),
         },
         blips = {
             name     = "ID Photo",
             sprite   = 1364029453,
             scale    = 0.6,
             modifier = "BLIP_MODIFIER_MP_COLOR_32",
-            coords   = vector3(-810.48, -1372.56, 44.07),
+            coords   = vector3(-810.48, -1372.56, 45.07),
         },
     },
 }
