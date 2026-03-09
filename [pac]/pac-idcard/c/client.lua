@@ -51,9 +51,7 @@ Citizen.CreateThread(function()
     movements3[2] = createPrompt(Config.Keybinds["printphoto"][1], "Develop Film",              promptGroup3)
 end)
 
-local function ctrl(key) return Config.Keybinds[key][2] end
-
--- ─── NUI Callbacks ────────────────────────────────────────────────────────────
+-- ─── NUI Callbacks ──────────────────────────────────────────────────────────
 RegisterNUICallback('close', function()
     SetNuiFocus(false, false)
     AnimpostfxStop("OJDominoBlur")
@@ -71,7 +69,37 @@ RegisterNUICallback('createIdCard', function(data)
     TriggerServerEvent('fx-idcard:server:buyIdCard', data)
 end)
 
--- ─── Network Events ───────────────────────────────────────────────────────────
+-- Camera movement comes from NUI keyboard events - bypasses game input system entirely
+-- This is the most reliable approach during RenderScriptCams
+RegisterNUICallback('camMove', function(data)
+    if not cam or not currentCamPos then return end
+    local step = 0.15
+    local pc   = data.pc  -- player chest target passed from NUI
+    local dir  = data.dir
+    if dir == "up"      then currentCamPos.z = currentCamPos.z + step
+    elseif dir == "down"   then currentCamPos.z = currentCamPos.z - step
+    elseif dir == "left"   then currentCamPos.y = currentCamPos.y - step
+    elseif dir == "right"  then currentCamPos.y = currentCamPos.y + step
+    elseif dir == "fwd"    then currentCamPos.x = currentCamPos.x + step
+    elseif dir == "back"   then currentCamPos.x = currentCamPos.x - step
+    elseif dir == "filter_next" then cycleFilter( 1); return
+    elseif dir == "filter_prev" then cycleFilter(-1); return
+    elseif dir == "exit"   then
+        -- exitCamera called from NUI - need to use stored key/heading
+        if _currentPhotoKey and _currentDefaultHeading then
+            exitCamera(_currentPhotoKey, _currentDefaultHeading)
+        else
+            exitCamera(nil, nil)
+        end
+        return
+    end
+    SetCamCoord(cam, currentCamPos.x, currentCamPos.y, currentCamPos.z)
+    if data.pcx then
+        PointCamAtCoord(cam, data.pcx, data.pcy, data.pcz)
+    end
+end)
+
+-- ─── Network Events ────────────────────────────────────────────────────────
 RegisterNetEvent('fx-idcard:client:setData',    function(d) idcardData = d     end)
 RegisterNetEvent('fx-idcard:client:clearData',  function()  idcardData = false end)
 RegisterNetEvent('fx-idcard:client:updateData', function()
@@ -108,7 +136,7 @@ RegisterNetEvent("fx-idcard:client:ShowUi", function(typee, data)
     end
 end)
 
--- ─── Helpers ──────────────────────────────────────────────────────────────────
+-- ─── Helpers ────────────────────────────────────────────────────────────
 function GetClosestPlayer()
     local myPed    = PlayerPedId()
     local myId     = PlayerId()
@@ -131,20 +159,18 @@ local function applyFilter(idx)
     SendNUIMessage({ action = 'setFilter', css = filter.css, name = filter.name })
 end
 
-local filterCooldown = false
-local function cycleFilter(dir)
-    if filterCooldown then return end
-    filterCooldown = true
+function cycleFilter(dir)
     currentFilter = currentFilter + dir
     local n = #Config.CameraFilters
     if currentFilter < 1 then currentFilter = n end
     if currentFilter > n then currentFilter = 1 end
     applyFilter(currentFilter)
-    Citizen.SetTimeout(200, function() filterCooldown = false end)
 end
 
--- ─── NPC heading helpers ──────────────────────────────────────────────────────
--- Flip photographer NPC to face the player during photo session, then restore.
+-- Stored for NUI exit callback
+_currentPhotoKey        = nil
+_currentDefaultHeading  = nil
+
 local function setPhotographerHeading(key, heading)
     local p = photographerPeds and photographerPeds[key]
     if p and DoesEntityExist(p) then
@@ -154,22 +180,24 @@ end
 
 local function exitCamera(photographerKey, restoreHeading)
     SendNUIMessage({ action = 'showCameraOverlay', visible = false })
+    -- Remove NUI focus first so game gets keyboard back
+    SetNuiFocus(false, false)
     RenderScriptCams(false, false, 0, true, true)
     if cam then DestroyCam(cam, true) end
     cam = nil
     currentCamPos = nil
+    _currentPhotoKey       = nil
+    _currentDefaultHeading = nil
     SetPlayerControl(PlayerId(), true)
     FreezeEntityPosition(PlayerPedId(), false)
-    SetNuiFocus(false, false)
     TriggerServerEvent('fx-idcard:server:setBucket', 0)
     Config.ShowHud()
-    -- Restore NPC heading to default (facing door/cash register)
     if photographerKey and restoreHeading then
         setPhotographerHeading(photographerKey, restoreHeading)
     end
 end
 
--- ─── Photo session ────────────────────────────────────────────────────────────
+-- ─── Photo session ───────────────────────────────────────────────────────────
 local function takePhoto(v, key)
     DoScreenFadeOut(1000)
     Wait(1000)
@@ -179,24 +207,29 @@ local function takePhoto(v, key)
     local pc  = v.pedCoords
     local cc  = v.camCoords
 
-    -- Flip NPC to face the player (heading=90 = faces West = toward player at x=-814)
+    -- Flip NPC to face player
     local defaultHeading = v.npc and v.npc.coords.w or 270.0
     local photoHeading   = v.npc and v.npc.photoHeading or 90.0
     setPhotographerHeading(key, photoHeading)
+    _currentPhotoKey       = key
+    _currentDefaultHeading = defaultHeading
 
     -- Place player at pose spot
+    -- NOTE: pedCoords.z is the REAL floor z (44.278 confirmed).
+    -- SetEntityCoords does NOT apply the +1 navmesh snap that CreatePed does.
     SetEntityCoords(ped, pc.x, pc.y, pc.z, false, false, false, false)
     SetEntityHeading(ped, pc.w)
     FreezeEntityPosition(ped, true)
     SetPlayerControl(PlayerId(), false)
-    Wait(300)
+    Wait(500)  -- slightly longer wait for coords to settle
 
     -- Build scripted camera
     cam = CreateCam("DEFAULT_SCRIPTED_CAMERA", true)
     currentCamPos = { x = cc.x, y = cc.y, z = cc.z }
     SetCamCoord(cam, cc.x, cc.y, cc.z)
-    -- Aim at player chest on startup
-    PointCamAtCoord(cam, pc.x, pc.y, pc.z + 0.7)
+    -- Aim at player chest
+    local targetZ = pc.z + 0.7
+    PointCamAtCoord(cam, pc.x, pc.y, targetZ)
     Citizen.InvokeNative(0x27666E5988D9D429, cam, v.camFov)
     SetCamActive(cam, true)
     RenderScriptCams(true, false, 0, true, true)
@@ -205,57 +238,18 @@ local function takePhoto(v, key)
 
     currentFilter = 1
     applyFilter(currentFilter)
-    SendNUIMessage({ action = 'showCameraOverlay', visible = true })
 
-    -- Camera control loop
-    -- Uses IsDisabledControlJustPressed for instant single-tap response (no hold needed).
-    -- Each tap moves the camera by 'step' units and re-aims at the player's chest.
-    Citizen.CreateThread(function()
-        local exitKey  = ctrl("exit")
-        local upKey    = ctrl("camUp")
-        local downKey  = ctrl("camDown")
-        local leftKey  = ctrl("camLeft")
-        local rightKey = ctrl("camRight")
-        local fwdKey   = ctrl("camForward")
-        local backKey  = ctrl("camBack")
-        local fnKey    = ctrl("filterNext")
-        local fpKey    = ctrl("filterPrev")
-        local step     = 0.15  -- larger step so each tap is noticeable
-
-        while cam do
-            PromptSetActiveGroupThisFrame(promptGroup1,
-                CreateVarString(10, 'LITERAL_STRING', "Photographer"))
-
-            -- EXIT
-            if IsControlJustPressed(0, exitKey) or IsDisabledControlJustPressed(0, exitKey) then
-                exitCamera(key, defaultHeading)
-                break
-            end
-
-            -- MOVEMENT: single tap = instant move, re-aim at player to stay framed
-            local moved = false
-            if IsDisabledControlJustPressed(0, upKey)    then currentCamPos.z = currentCamPos.z + step; moved = true end
-            if IsDisabledControlJustPressed(0, downKey)  then currentCamPos.z = currentCamPos.z - step; moved = true end
-            if IsDisabledControlJustPressed(0, leftKey)  then currentCamPos.y = currentCamPos.y - step; moved = true end
-            if IsDisabledControlJustPressed(0, rightKey) then currentCamPos.y = currentCamPos.y + step; moved = true end
-            if IsDisabledControlJustPressed(0, fwdKey)   then currentCamPos.x = currentCamPos.x + step; moved = true end
-            if IsDisabledControlJustPressed(0, backKey)  then currentCamPos.x = currentCamPos.x - step; moved = true end
-
-            if moved and cam then
-                SetCamCoord(cam, currentCamPos.x, currentCamPos.y, currentCamPos.z)
-                PointCamAtCoord(cam, pc.x, pc.y, pc.z + 0.7)
-            end
-
-            -- FILTERS: tap to cycle
-            if IsDisabledControlJustPressed(0, fnKey) then cycleFilter( 1) end
-            if IsDisabledControlJustPressed(0, fpKey) then cycleFilter(-1) end
-
-            Wait(0)
-        end
-    end)
+    -- Tell NUI to show overlay AND pass the player target coords for re-aiming after nudge
+    SendNUIMessage({
+        action  = 'showCameraOverlay',
+        visible = true,
+        pcx     = pc.x,
+        pcy     = pc.y,
+        pcz     = targetZ,
+    })
 end
 
--- ─── Photographer NPC spawn ───────────────────────────────────────────────────
+-- ─── Photographer NPC spawn ─────────────────────────────────────────────────
 photographerPeds = {}
 
 local function spawnPhotographerPed(key, v)
@@ -316,7 +310,7 @@ Citizen.CreateThread(function()
     end
 end)
 
--- ─── Photographer blips ───────────────────────────────────────────────────────
+-- ─── Photographer blips ─────────────────────────────────────────────────────
 local function createPhotographerBlip(v)
     local c    = v.blips.coords or vector3(v.promptCoords.x, v.promptCoords.y, v.promptCoords.z)
     local blip = N_0x554d9d53f696d002(1664425300, c.x, c.y, c.z)
@@ -336,7 +330,7 @@ Citizen.CreateThread(function()
     end
 end)
 
--- ─── Photographer approach interaction ───────────────────────────────────────
+-- ─── Photographer approach interaction ──────────────────────────────────────
 Citizen.CreateThread(function()
     while true do
         local sleep = 2000
@@ -370,7 +364,7 @@ Citizen.CreateThread(function()
     end
 end)
 
--- ─── /phototest ───────────────────────────────────────────────────────────────
+-- ─── /phototest ────────────────────────────────────────────────────────────
 RegisterCommand("phototest", function()
     local me = GetEntityCoords(PlayerPedId())
     print(string.format("[phototest] player x=%.3f y=%.3f z=%.3f cam=%s",
@@ -395,7 +389,7 @@ RegisterCommand("phototest", function()
     end
 end, false)
 
--- ─── IDCard NPC ───────────────────────────────────────────────────────────────
+-- ─── IDCard NPC ─────────────────────────────────────────────────────────────
 local function isOpen(s)
     if not s then return true end
     local h = GetClockHours()
@@ -490,14 +484,14 @@ Citizen.CreateThread(function()
     end
 end)
 
--- ─── /idcard ──────────────────────────────────────────────────────────────────
+-- ─── /idcard ────────────────────────────────────────────────────────────
 if Config.TakeCardType == "sql" then
     RegisterCommand(Config.ShowIdcardCommand, function()
         TriggerEvent("fx-idcard:client:showIDCardSQL")
     end)
 end
 
--- ─── Cleanup ──────────────────────────────────────────────────────────────────
+-- ─── Cleanup ────────────────────────────────────────────────────────────
 AddEventHandler('onResourceStop', function(resourceName)
     if GetCurrentResourceName() ~= resourceName then return end
     for _, v in pairs(Config.Photographers) do
