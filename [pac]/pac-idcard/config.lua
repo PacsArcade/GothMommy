@@ -102,7 +102,7 @@ Config.ShowDistance            = 1.5
 Config.Photographers = {
     ["Blackwater"] = {
         promptCoords   = vector4(-810.48, -1372.56, 43.02, 104.9485),
-        promptDistance = 5,   -- increased from 2 so players trigger it further inside
+        promptDistance = 5,
         pedCoords      = vector4(-810.48, -1372.56, 43.02, 285.0),
         camCoords      = vector4(-814.40, -1374.85, 44.90, 86.48),
         camFov         = 60.0,
@@ -114,7 +114,7 @@ Config.Photographers = {
         },
         blips = {
             name     = "ID Photo",
-            sprite   = 0xB0E5E617,  -- SaddleBag icon — period-appropriate for a traveling photographer
+            sprite   = 1364029453,  -- blip_photo_studio
             scale    = 0.6,
             modifier = "BLIP_MODIFIER_MP_COLOR_32",
             coords   = vector3(-810.48, -1372.56, 43.02),
