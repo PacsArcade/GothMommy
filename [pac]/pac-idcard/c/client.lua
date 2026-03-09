@@ -1,5 +1,5 @@
 -- =============================================================
-print("[pac-idcard] VERSION: 2026-03-09-v16 filter-v3+camfix")
+print("[pac-idcard] VERSION: 2026-03-09-v17 final-filters+screenshot")
 -- =============================================================
 
 local idcardData    = false
@@ -21,24 +21,12 @@ local applyFilter
 
 local function stopPostfx()
     if activePostfx then AnimpostfxStop(activePostfx); activePostfx = nil end
-    if activeTCM then
-        ClearTimecycleModifier()
-        activeTCM = nil
-    end
+    if activeTCM then ClearTimecycleModifier(); activeTCM = nil end
 end
 
 local function playPostfx(name)
     stopPostfx()
     if name then AnimpostfxPlay(name, 0, true); activePostfx = name end
-end
-
-local function setTCM(name, strength)
-    if activeTCM then ClearTimecycleModifier() end
-    if name then
-        SetTimecycleModifier(name)
-        SetTimecycleModifierStrength(strength or 1.0)
-        activeTCM = name
-    end
 end
 
 local function createPrompt(inputName, label, promptGroup, holdMs)
@@ -100,8 +88,15 @@ end)
 RegisterNUICallback('createIdCard', function(data)
     TriggerServerEvent('fx-idcard:server:buyIdCard', data)
 end)
+
+-- Screenshot: use the native export + F5 (RDR screenshot key = 166 INPUT_SCREENSHOT)
 RegisterNUICallback('camShoot', function(data)
+    -- Native screenshot export
     Citizen.InvokeNative(0x3B96D87CB7DA1245, true)
+    -- Also fire the game's screenshot input so it saves to the gallery
+    Citizen.InvokeNative(0xF7F35D8B26D22890, 0, 166, 0, 0, 0.0, 0.0, 0.0, 0.0, 0.0, false)
+    Citizen.Wait(100)
+    Citizen.InvokeNative(0xF7F35D8B26D22890, 0, 166, 1, 0, 0.0, 0.0, 0.0, 0.0, 0.0, false)
 end)
 
 RegisterNUICallback('camMove', function(data)
@@ -122,7 +117,6 @@ RegisterNUICallback('camMove', function(data)
     end
     if not cam or not currentCamPos then return end
     local step = 0.15
-    -- NUM8=up, NUM2=down, NUM4=left, NUM6=right, NUM7=zoom_in(fwd), NUM9=zoom_out(back)
     if     dir == "up"    then currentCamPos.z = currentCamPos.z + step
     elseif dir == "down"  then currentCamPos.z = currentCamPos.z - step
     elseif dir == "left"  then currentCamPos.y = currentCamPos.y + step
@@ -190,8 +184,7 @@ applyFilter = function(idx)
     if not f or #f == 0 then return end
     local filter = f[idx] or f[1]
     stopPostfx()
-    if filter.postfx  then playPostfx(filter.postfx) end
-    if filter.tcm     then setTCM(filter.tcm, filter.tcmStrength) end
+    if filter.postfx then playPostfx(filter.postfx) end
     SendNUIMessage({
         action     = 'setFilter',
         name       = filter.name,
@@ -263,13 +256,7 @@ local function takePhoto(v, key)
     Wait(500); DoScreenFadeIn(1000)
     currentFilter = 1; applyFilter(currentFilter)
     SetNuiFocus(true, false)
-    -- Pass the player's world position and the cam FOV so NUI can compute
-    -- where the eyes appear on screen for the demon eyes filter
-    SendNUIMessage({
-        action='showCameraOverlay', visible=true,
-        pcx=pc.x, pcy=pc.y, pcz=targetZ,
-        camFov = v.camFov,
-    })
+    SendNUIMessage({ action='showCameraOverlay', visible=true, pcx=pc.x, pcy=pc.y, pcz=targetZ })
 end
 
 photographerPeds = {}
@@ -291,7 +278,7 @@ local function spawnPhotographerPed(key, v)
         end
     end
     local p = CreatePed(hash, coords.x, coords.y, coords.z, coords.w, false, 0)
-    if not DoesEntityExist(p) then print("[pac-idcard] ERROR: could not spawn photographer '"..key.."'"); return end
+    if not DoesEntityExist(p) then print("[pac-idcard] ERROR: could not spawn '"..key.."'"); return end
     FreezeEntityPosition(p, true)
     Citizen.InvokeNative(0x283978A15512B2FE, p, true)
     SetEntityCanBeDamaged(p, false); SetEntityInvincible(p, true)
@@ -300,7 +287,7 @@ local function spawnPhotographerPed(key, v)
     SetModelAsNoLongerNeeded(hash); SetEntityAsMissionEntity(p, true, true)
     ClearPedTasks(p)
     photographerPeds[key] = p
-    print(string.format("[pac-idcard] Spawned photographer '%s' ped=%d at z=%.3f heading=%.1f",
+    print(string.format("[pac-idcard] Spawned '%s' ped=%d z=%.3f h=%.1f",
         key, p, GetEntityCoords(p).z, coords.w))
 end
 
@@ -349,8 +336,7 @@ Citizen.CreateThread(function()
                     PromptSetActiveGroupThisFrame(promptGroup3, CreateVarString(10,'LITERAL_STRING',"Photographer"))
                     if movements3[1] and PromptHasHoldModeCompleted(movements3[1]) then
                         Config.HideHud(); takePhoto(v, k)
-                        while cam do Wait(500) end
-                        sleep = 2000
+                        while cam do Wait(500) end; sleep = 2000
                     elseif movements3[2] and PromptHasHoldModeCompleted(movements3[2]) then
                         SetNuiFocus(true, true); SendNUIMessage({ action = 'print' })
                     end
@@ -369,12 +355,10 @@ RegisterCommand("phototest", function()
         local p = photographerPeds[k]
         if p and DoesEntityExist(p) then
             local pc = GetEntityCoords(p); local dist = #(me - pc)
-            print(string.format("[phototest] '%s' ped=%d x=%.3f y=%.3f z=%.3f heading=%.1f dist=%.2f %s",
-                k, p, pc.x, pc.y, pc.z, GetEntityHeading(p), dist,
+            print(string.format("[phototest] '%s' ped=%d z=%.3f h=%.1f dist=%.2f %s",
+                k, p, pc.z, GetEntityHeading(p), dist,
                 dist < Config.TalkDistance and "<<IN RANGE>>" or "out of range"))
-        else
-            print("[phototest] '"..k.."' NOT SPAWNED")
-        end
+        else print("[phototest] '"..k.."' NOT SPAWNED") end
     end
 end, false)
 

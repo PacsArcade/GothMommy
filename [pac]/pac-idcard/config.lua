@@ -108,35 +108,30 @@ Config.Religious = {
 }
 
 --[[
-  Camera key layout (numpad):
-    NUM 8 = cam up       NUM 2 = cam down
-    NUM 4 = cam left     NUM 6 = cam right
-    NUM 7 = zoom in      NUM 9 = zoom out
-    NUM 1 = filter prev  NUM 3 = filter next
+  Camera numpad layout:
+    NUM 8 = cam up        NUM 2 = cam down
+    NUM 4 = cam left      NUM 6 = cam right
+    NUM 7 = zoom in       NUM 9 = zoom out
+    NUM 1 = filter prev   NUM 3 = filter next
     NUM 5 = reset
     NUM 0 / Backspace / Escape = exit
-    Enter / NumpadEnter = take photo
+    Enter / NumpadEnter = take photo (3-2-1 countdown)
 
-  filterType values:
-    nil          = None
-    "solid"      = translucent colour panel over scene
-    "demon"      = dark vignette + precise red eye-glow on face
-    "acid"       = cycling colour flood + SVG turbulence warp + CSS distort
-    "blur"       = frosted white haze (+ Lua postfx)
-    "pixel"      = low-res pixelated canvas grid
-
-  postfx = optional AnimpostfxPlay name (affects actual 3D render)
-  tcm    = optional SetTimecycleModifier name
+  filterType:
+    nil      = None
+    "solid"  = translucent colour panel
+    "acid"   = muted lava-lamp colour warp
+    "fog"    = dirty lens fog effect
+    "pixel"  = low-res pixelated overlay
 ]]
 Config.CameraFilters = {
     { name = "None" },
-    { name = "Sepia",        filterType = "solid",  r=110, g=65,  b=15,  a=0.42 },
-    { name = "Thunderstorm", filterType = "solid",  r=20,  g=28,  b=75,  a=0.45 },
-    { name = "Blood Moon",   filterType = "solid",  r=150, g=5,   b=5,   a=0.42 },
-    { name = "Demon Eyes",   filterType = "demon"  },
-    { name = "Acid Trip",    filterType = "acid"   },
-    { name = "Blurry",       filterType = "blur",   postfx = "SwitchHUDIn" },
-    { name = "Pixelated",    filterType = "pixel",  size = 8 },
+    { name = "Sepia",        filterType = "solid", r=110, g=65, b=15, a=0.40 },
+    { name = "Thunderstorm", filterType = "solid", r=20,  g=28, b=75, a=0.42 },
+    { name = "Blood Moon",   filterType = "solid", r=150, g=5,  b=5,  a=0.40 },
+    { name = "Acid Trip",    filterType = "acid"  },
+    { name = "Foggy Lens",   filterType = "fog"   },
+    { name = "Pixelated",    filterType = "pixel", size = 8 },
 }
 
 Config.IDCardNPC = {

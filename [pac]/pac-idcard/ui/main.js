@@ -12,53 +12,43 @@ $(document).ready(function () {
 
     var $solid = $('#fl-solid');
     var $pixel = $('#fl-pixel');
-    var $blur  = $('#fl-blur');
+    var $fog   = $('#fl-fog');
     var $acid  = $('#fl-acid');
-    var $demon = $('#fl-demon');
     var pixelCanvas = document.getElementById('pixel-canvas');
     var pixelCtx    = pixelCanvas ? pixelCanvas.getContext('2d') : null;
 
-    // ── clear all filter layers ────────────────────────────────────────────
     function clearFilters() {
         $solid.hide().css('background','');
         $pixel.hide();
         if (pixelCtx) pixelCtx.clearRect(0,0,pixelCanvas.width,pixelCanvas.height);
-        $blur.hide();
+        $fog.hide();
         $acid.hide();
-        $demon.hide();
     }
 
-    // ── pixel filter ───────────────────────────────────────────────────────
-    // Draws a tiny low-res canvas (1px per block) then CSS scales it back
-    // to fill the screen with image-rendering:pixelated → chunky blocks.
-    // Uses a warm sepia/dark tone palette for a daguerreotype look.
+    // Pixel: small canvas drawn at 1px-per-block, stretched via CSS
+    // to fill screen with image-rendering:pixelated
     function startPixel(bs) {
         bs = Math.max(bs || 8, 4);
         var W = window.innerWidth,  H = window.innerHeight;
         var w = Math.ceil(W / bs),  h = Math.ceil(H / bs);
         pixelCanvas.width  = w;
         pixelCanvas.height = h;
-        // Fill with a base warm dark tone
-        pixelCtx.fillStyle = 'rgba(40,24,8,0.55)';
+        // Warm dark base
+        pixelCtx.fillStyle = 'rgba(35,20,6,0.30)';
         pixelCtx.fillRect(0, 0, w, h);
-        // Overlay pattern: alternating dark/slightly-lighter blocks
-        // that mimic JPEG blocking artefacts on a low-res image
+        // Checker dither on top - lighter blocks show the scene
         for (var y = 0; y < h; y++) {
             for (var x = 0; x < w; x++) {
-                // checker dither pattern — gives blocky pixel feeling
                 var v = ((x ^ y) & 1);
-                var r = 55 + v * 22;
-                var g = 32 + v * 14;
-                var b = 10 + v * 6;
-                var a = (0.35 + v * 0.20).toFixed(2);
-                pixelCtx.fillStyle = 'rgba('+r+','+g+','+b+','+a+')';
+                pixelCtx.fillStyle = v
+                    ? 'rgba(70,42,15,0.28)'
+                    : 'rgba(20,10,2,0.18)';
                 pixelCtx.fillRect(x, y, 1, 1);
             }
         }
         $pixel.show();
     }
 
-    // ── apply filter ───────────────────────────────────────────────────────
     function setFilter(d) {
         clearFilters();
         var type = d.filterType;
@@ -68,19 +58,16 @@ $(document).ready(function () {
             $solid.css('background',
                 'rgba('+(d.r||0)+','+(d.g||0)+','+(d.b||0)+','+(d.a||0.40)+')');
             $solid.show();
-        } else if (type === 'blur') {
-            $blur.show();
+        } else if (type === 'fog') {
+            $fog.show();
         } else if (type === 'acid') {
             $acid.show();
-        } else if (type === 'demon') {
-            $demon.show();
         } else if (type === 'pixel') {
             startPixel(d.size || 8);
         }
         $('#filter-label').text(d.name || 'None');
     }
 
-    // ── countdown + shoot ─────────────────────────────────────────────────
     function doCountdownAndShoot() {
         if (shootLocked) return;
         shootLocked = true;
@@ -93,9 +80,11 @@ $(document).ready(function () {
                 setTimeout(showNext, 900);
             } else {
                 $cd.hide();
+                // White flash
                 $flash.css({display:'block',opacity:1}).animate({opacity:0},500,function(){$flash.hide();});
+                // Tell Lua to fire the screenshot native
                 $.post('https://'+GetParentResourceName()+'/camShoot', JSON.stringify({}));
-                $('#cam-saved-toast').stop(true).css({display:'block',opacity:1}).delay(2200).fadeOut(600);
+                $('#cam-saved-toast').stop(true).css({display:'block',opacity:1}).delay(2500).fadeOut(600);
                 setTimeout(function(){ $('#cam-controls,#filter-bar').fadeIn(300); }, 700);
                 shootLocked = false;
             }
@@ -103,13 +92,6 @@ $(document).ready(function () {
         showNext();
     }
 
-    // ── keyboard ──────────────────────────────────────────────────────────
-    // NUM 8 = cam up       NUM 2 = cam down
-    // NUM 4 = cam left     NUM 6 = cam right
-    // NUM 7 = zoom in(fwd) NUM 9 = zoom out(back)
-    // NUM 1 = filter prev  NUM 3 = filter next
-    // NUM 5 = reset        NUM 0 / BS / ESC = exit
-    // Enter / NumpadEnter = shoot
     var keyMap = {
         'Numpad8':'up',    'Numpad2':'down',
         'Numpad4':'left',  'Numpad6':'right',
@@ -131,7 +113,6 @@ $(document).ready(function () {
         }));
     });
 
-    // ── ID card ───────────────────────────────────────────────────────────
     function setupIDCard(array) {
         if (!array || typeof array !== 'object') return;
         var sex = array.sex === 'Female' ? 'F' : 'M';
@@ -154,7 +135,6 @@ $(document).ready(function () {
             .one('animationend',function(){$(this).hide();});
     }
 
-    // ── form ──────────────────────────────────────────────────────────────
     $('#submit').click(function(){
         $.post('https://'+GetParentResourceName()+'/createIdCard', JSON.stringify({
             name:$('#name').val(), cityname:$('#cityname').val(), religious:$('#religious').val(),
@@ -205,7 +185,6 @@ $(document).ready(function () {
 
     var ShowPhoto=false, ShowIdCard=false;
 
-    // ── message handler ───────────────────────────────────────────────────
     window.addEventListener('message',function(event){
         var d=event.data;
         switch(d.action){
@@ -221,9 +200,7 @@ $(document).ready(function () {
                 CreateIdCardSetData(d.array,d.illegal);
                 $('.create,.previewcreate-photo').fadeIn(500);
                 break;
-            case 'setFilter':
-                setFilter(d);
-                break;
+            case 'setFilter': setFilter(d); break;
             case 'showCameraOverlay':
                 if(d.visible){
                     camTarget={pcx:d.pcx||0,pcy:d.pcy||0,pcz:d.pcz||0};
@@ -233,8 +210,7 @@ $(document).ready(function () {
                     $('#cam-controls,#filter-bar').show();
                     $('#camera-overlay').show();
                 } else {
-                    cameraActive=false;
-                    clearFilters();
+                    cameraActive=false; clearFilters();
                     $('#camera-overlay').hide();
                     $('#filter-label').text('');
                     $('#cam-countdown').hide();
