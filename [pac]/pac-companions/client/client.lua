@@ -146,6 +146,8 @@ end)
 
 -- =====================================================================
 -- MAIN LOOP: shop proximity prompt + U key to call/flee pet
+-- Config.CallPetKey = true enables the U key (set in config.lua)
+-- Uses control index 1 for keyboard input in RedM
 -- =====================================================================
 Citizen.CreateThread(function()
     while true do
@@ -163,10 +165,8 @@ Citizen.CreateThread(function()
             end
         end
 
-        -- U key: call pet if none active, flee if active
-        -- Fixed: was using IsControlJustReleased + broken counter, now direct IsControlJustPressed
         if Config.CallPetKey == true then
-            if IsControlJustPressed(0, keys[Config.TriggerKeys.CallPet]) then
+            if IsControlJustPressed(1, keys[Config.TriggerKeys.CallPet]) then
                 if currentPetPed and DoesEntityExist(currentPetPed) then
                     TriggerEvent('rdn_companions:putaway')
                 else
