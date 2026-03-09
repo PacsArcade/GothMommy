@@ -1,13 +1,13 @@
 local idcardData    = false
-local cam           = nil   -- MUST be nil, not 0: 'not 0' is false in Lua!
+local cam           = nil   -- MUST be nil not 0
 local currentCamPos = nil
 local movements     = {}
 local movements2    = {}
-local movements3    = {}  -- photographer prompts
+local movements3    = {}
 local creating      = false
 local currentFilter = 1
 
--- ─── Prompt setup ────────────────────────────────────────────────────────────
+-- ─── Prompt helpers ───────────────────────────────────────────────────────────
 local function createPrompt(inputName, label, promptGroup, holdMs)
     holdMs = holdMs or 500
     local m = PromptRegisterBegin()
@@ -25,12 +25,11 @@ end
 
 local promptGroup1 = GetRandomIntInRange(0, 0xffffff)  -- camera controls
 local promptGroup2 = GetRandomIntInRange(0, 0xffffff)  -- idcard NPC
-local promptGroup3 = GetRandomIntInRange(0, 0xffffff)  -- photographer NPC
+local promptGroup3 = GetRandomIntInRange(0, 0xffffff)  -- photographer approach
 
 Citizen.CreateThread(function()
     Citizen.Wait(10)
-    -- Camera controls (promptGroup1) — shown while in camera mode
-    local pg1keys = {
+    local pg1 = {
         { Config.Keybinds["takephoto"][1],  Locale("takephoto")  },
         { Config.Keybinds["printphoto"][1], Locale("printphoto") },
         { Config.Keybinds["exit"][1],       Locale("exit")       },
@@ -43,20 +42,18 @@ Citizen.CreateThread(function()
         { Config.Keybinds["filterPrev"][1], Locale("filterPrev") },
         { Config.Keybinds["filterNext"][1], Locale("filterNext") },
     }
-    for _, kd in ipairs(pg1keys) do
+    for _, kd in ipairs(pg1) do
         movements[#movements+1] = createPrompt(kd[1], kd[2], promptGroup1)
     end
-    -- IDCard NPC prompt (promptGroup2)
     movements2[1] = createPrompt(Config.Keybinds["takeidcard"][1], Locale("takeidcard"), promptGroup2)
-    -- Photographer approach prompts (promptGroup3)
-    local photoPrice = Config.Prices and Config.Prices.printphoto or 5
-    movements3[1] = createPrompt(Config.Keybinds["takeidcard"][1],  "Take Photo ($" .. photoPrice .. ")", promptGroup3)
-    movements3[2] = createPrompt(Config.Keybinds["printphoto"][1], "Develop Film", promptGroup3)
+    local price = (Config.Prices and Config.Prices.printphoto) or 5
+    movements3[1] = createPrompt(Config.Keybinds["takeidcard"][1],  "Take Photo ($"..price..")", promptGroup3)
+    movements3[2] = createPrompt(Config.Keybinds["printphoto"][1], "Develop Film",              promptGroup3)
 end)
 
 local function ctrl(key) return Config.Keybinds[key][2] end
 
--- ─── NUI Callbacks ───────────────────────────────────────────────────────────
+-- ─── NUI Callbacks ──────────────────────────────────────────────────────────
 RegisterNUICallback('close', function()
     SetNuiFocus(false, false)
     AnimpostfxStop("OJDominoBlur")
@@ -74,7 +71,7 @@ RegisterNUICallback('createIdCard', function(data)
     TriggerServerEvent('fx-idcard:server:buyIdCard', data)
 end)
 
--- ─── Network Events ──────────────────────────────────────────────────────────
+-- ─── Network Events ─────────────────────────────────────────────────────────
 RegisterNetEvent('fx-idcard:client:setData',    function(d) idcardData = d     end)
 RegisterNetEvent('fx-idcard:client:clearData',  function()  idcardData = false end)
 RegisterNetEvent('fx-idcard:client:updateData', function()
@@ -111,7 +108,7 @@ RegisterNetEvent("fx-idcard:client:ShowUi", function(typee, data)
     end
 end)
 
--- ─── Helpers ─────────────────────────────────────────────────────────────────
+-- ─── Helpers ────────────────────────────────────────────────────────────────
 function GetClosestPlayer()
     local myPed    = PlayerPedId()
     local myId     = PlayerId()
@@ -152,16 +149,20 @@ local function cycleFilter(dir)
     if currentFilter < 1 then currentFilter = n end
     if currentFilter > n then currentFilter = 1 end
     applyFilter(currentFilter)
-    Citizen.SetTimeout(250, function() filterCooldown = false end)
+    Citizen.SetTimeout(200, function() filterCooldown = false end)
 end
 
--- Camera move: uses world-space offsets directly since we have a fixed-angle cam
-local function moveCam(dx, dy, dz)
-    local x = currentCamPos.x + dx
-    local y = currentCamPos.y + dy
-    local z = currentCamPos.z + dz
-    currentCamPos = vector4(x, y, z, currentCamPos.w)
-    SetCamCoord(cam, x, y, z)
+-- Simple world-offset camera nudge
+local function nudgeCam(dx, dy, dz)
+    local nx = currentCamPos.x + dx
+    local ny = currentCamPos.y + dy
+    local nz = currentCamPos.z + dz
+    currentCamPos = vector4(nx, ny, nz, currentCamPos.w)
+    SetCamCoord(cam, nx, ny, nz)
+    -- Keep pointing at subject (stored in camTarget global)
+    if _camTargetX then
+        PointCamAtCoord(cam, _camTargetX, _camTargetY, _camTargetZ)
+    end
 end
 
 local function exitCamera()
@@ -169,6 +170,7 @@ local function exitCamera()
     RenderScriptCams(false, false, 0, true, true)
     if cam then DestroyCam(cam, true) end
     cam = nil
+    _camTargetX, _camTargetY, _camTargetZ = nil, nil, nil
     SetPlayerControl(PlayerId(), true)
     FreezeEntityPosition(PlayerPedId(), false)
     SetNuiFocus(false, false)
@@ -176,55 +178,68 @@ local function exitCamera()
     Config.ShowHud()
 end
 
--- ─── Camera / photo session ───────────────────────────────────────────────────
+-- ─── Photo session ──────────────────────────────────────────────────────────────
 local function takePhoto(v)
     DoScreenFadeOut(1000)
     Wait(1000)
     TriggerServerEvent('fx-idcard:server:setBucket', GetPlayerServerId(PlayerId()))
+
     local ped = PlayerPedId()
-    -- Place player at pedCoords (back wall pose spot), facing the camera
-    SetEntityCoords(ped, v.pedCoords.x, v.pedCoords.y, v.pedCoords.z)
-    SetEntityHeading(ped, v.pedCoords.w)
+    local pc  = v.pedCoords
+
+    -- Teleport player to the pose spot (back wall)
+    SetEntityCoords(ped, pc.x, pc.y, pc.z, false, false, false, false)
+    SetEntityHeading(ped, pc.w)
     FreezeEntityPosition(ped, true)
     SetPlayerControl(PlayerId(), false)
+    Wait(200)  -- let world stream
 
+    -- Store the target point (player chest height)
+    _camTargetX = pc.x
+    _camTargetY = pc.y
+    _camTargetZ = pc.z + 0.65
+
+    -- Place camera near the tripod, pointing at subject
+    local cc = v.camCoords
     cam = CreateCam("DEFAULT_SCRIPTED_CAMERA", true)
-    currentCamPos = v.camCoords
-    SetCamCoord(cam, currentCamPos.x, currentCamPos.y, currentCamPos.z)
-    -- Point camera at player position so it looks at the subject
-    PointCamAtCoord(cam, v.pedCoords.x, v.pedCoords.y, v.pedCoords.z + 0.6)
+    currentCamPos = cc
+    SetCamCoord(cam, cc.x, cc.y, cc.z)
+    PointCamAtCoord(cam, _camTargetX, _camTargetY, _camTargetZ)
     Citizen.InvokeNative(0x27666E5988D9D429, cam, v.camFov)
     SetCamActive(cam, true)
     RenderScriptCams(true, false, 0, true, true)
-    Wait(1000)
+
+    Wait(800)
     DoScreenFadeIn(1000)
 
     currentFilter = 1
     applyFilter(currentFilter)
     SendNUIMessage({ action = 'showCameraOverlay', visible = true })
 
-    -- Camera control loop
-    -- Uses IsControlPressed (not IsDisabledControlPressed) inside scripted cam
+    -- Per-frame camera control loop
     Citizen.CreateThread(function()
         while cam do
-            PromptSetActiveGroupThisFrame(promptGroup1, CreateVarString(10,'LITERAL_STRING',"Photographer"))
+            PromptSetActiveGroupThisFrame(promptGroup1,
+                CreateVarString(10, 'LITERAL_STRING', "Photographer"))
             setActivePrompts("camera")
 
-            -- EXIT
-            if IsControlJustPressed(0, ctrl("exit")) or IsDisabledControlJustPressed(0, ctrl("exit")) then
-                exitCamera()
-                break
+            -- EXIT (both variants)
+            if IsControlJustPressed(0, ctrl("exit")) or
+               IsDisabledControlJustPressed(0, ctrl("exit")) then
+                exitCamera(); break
             end
-            -- CAM MOVE — hold to move
-            if IsControlPressed(0, ctrl("camUp"))      or IsDisabledControlPressed(0, ctrl("camUp"))      then moveCam(0, 0,  0.02) end
-            if IsControlPressed(0, ctrl("camDown"))    or IsDisabledControlPressed(0, ctrl("camDown"))    then moveCam(0, 0, -0.02) end
-            if IsControlPressed(0, ctrl("camLeft"))    or IsDisabledControlPressed(0, ctrl("camLeft"))    then moveCam(0, -0.02, 0) end
-            if IsControlPressed(0, ctrl("camRight"))   or IsDisabledControlPressed(0, ctrl("camRight"))   then moveCam(0,  0.02, 0) end
-            if IsControlPressed(0, ctrl("camForward")) or IsDisabledControlPressed(0, ctrl("camForward")) then moveCam(-0.02, 0, 0) end
-            if IsControlPressed(0, ctrl("camBack"))    or IsDisabledControlPressed(0, ctrl("camBack"))    then moveCam( 0.02, 0, 0) end
-            -- FILTERS
-            if IsControlJustPressed(0, ctrl("filterNext")) or IsDisabledControlJustPressed(0, ctrl("filterNext")) then cycleFilter(1)  end
-            if IsControlJustPressed(0, ctrl("filterPrev")) or IsDisabledControlJustPressed(0, ctrl("filterPrev")) then cycleFilter(-1) end
+
+            -- MOVE CAM (hold)
+            if IsControlPressed(0, ctrl("camUp"))      or IsDisabledControlPressed(0, ctrl("camUp"))      then nudgeCam(0,0, 0.03) end
+            if IsControlPressed(0, ctrl("camDown"))    or IsDisabledControlPressed(0, ctrl("camDown"))    then nudgeCam(0,0,-0.03) end
+            if IsControlPressed(0, ctrl("camLeft"))    or IsDisabledControlPressed(0, ctrl("camLeft"))    then nudgeCam(0,-0.03,0) end
+            if IsControlPressed(0, ctrl("camRight"))   or IsDisabledControlPressed(0, ctrl("camRight"))   then nudgeCam(0, 0.03,0) end
+            if IsControlPressed(0, ctrl("camForward")) or IsDisabledControlPressed(0, ctrl("camForward")) then nudgeCam(-0.03,0,0) end
+            if IsControlPressed(0, ctrl("camBack"))    or IsDisabledControlPressed(0, ctrl("camBack"))    then nudgeCam( 0.03,0,0) end
+
+            -- FILTERS (tap)
+            if IsControlJustPressed(0,ctrl("filterNext")) or IsDisabledControlJustPressed(0,ctrl("filterNext")) then cycleFilter( 1) end
+            if IsControlJustPressed(0,ctrl("filterPrev")) or IsDisabledControlJustPressed(0,ctrl("filterPrev")) then cycleFilter(-1) end
 
             Wait(1)
         end
@@ -254,32 +269,33 @@ local function spawnPhotographerPed(key, v)
             break
         end
     end
-    local ped = CreatePed(hash, coords.x, coords.y, coords.z, coords.w, false, 0)
-    if not DoesEntityExist(ped) then
-        print("[pac-idcard] ERROR: Failed to create photographer ped for " .. key)
+    -- Spawn at exact coords (no z offset - NPC is not IDCard NPC)
+    local p = CreatePed(hash, coords.x, coords.y, coords.z, coords.w, false, 0)
+    if not DoesEntityExist(p) then
+        print("[pac-idcard] ERROR: could not create photographer ped '"..key.."'")
         return
     end
-    FreezeEntityPosition(ped, true)
-    Citizen.InvokeNative(0x283978A15512B2FE, ped, true)
-    SetEntityCanBeDamaged(ped, false)
-    SetEntityInvincible(ped, true)
-    SetBlockingOfNonTemporaryEvents(ped, true)
-    Citizen.InvokeNative(0xD8B8CFD709214ACD, ped, true)
+    FreezeEntityPosition(p, true)
+    Citizen.InvokeNative(0x283978A15512B2FE, p, true)
+    SetEntityCanBeDamaged(p, false)
+    SetEntityInvincible(p, true)
+    SetBlockingOfNonTemporaryEvents(p, true)
+    Citizen.InvokeNative(0xD8B8CFD709214ACD, p, true)
     SetModelAsNoLongerNeeded(hash)
-    SetEntityAsMissionEntity(ped, true, true)
-    ClearPedTasks(ped)
-    photographerPeds[key] = ped
-    print(string.format("[pac-idcard] Spawned photographer '%s' ped=%d at z=%.2f heading=%.1f",
-        key, ped, coords.z, coords.w))
+    SetEntityAsMissionEntity(p, true, true)
+    ClearPedTasks(p)
+    photographerPeds[key] = p
+    print(string.format("[pac-idcard] Spawned photographer '%s' ped=%d z=%.3f heading=%.1f",
+        key, p, coords.z, coords.w))
 end
 
 Citizen.CreateThread(function()
     while true do
-        local coords = GetEntityCoords(PlayerPedId())
+        local pos = GetEntityCoords(PlayerPedId())
         for key, v in pairs(Config.Photographers) do
             if v.npc then
-                local ncoords = v.npc.coords
-                local dist = #(coords - vector3(ncoords.x, ncoords.y, ncoords.z))
+                local nc   = v.npc.coords
+                local dist = #(pos - vector3(nc.x, nc.y, nc.z))
                 if dist < Config.PedSpawnDistance and not photographerPeds[key] then
                     spawnPhotographerPed(key, v)
                 elseif dist > Config.PedSpawnDistance + 10 and photographerPeds[key] then
@@ -292,9 +308,9 @@ Citizen.CreateThread(function()
     end
 end)
 
--- ─── Photographer blips ───────────────────────────────────────────────────────
+-- ─── Photographer blips ──────────────────────────────────────────────────────
 local function createPhotographerBlip(v)
-    local c = v.blips.coords or vector3(v.promptCoords.x, v.promptCoords.y, v.promptCoords.z)
+    local c    = v.blips.coords or vector3(v.promptCoords.x, v.promptCoords.y, v.promptCoords.z)
     local blip = N_0x554d9d53f696d002(1664425300, c.x, c.y, c.z)
     Citizen.InvokeNative(0x0DF2B55F717DDB10, blip, false)
     Citizen.InvokeNative(0x662D364ABF16DE2F, blip, joaat(v.blips.modifier))
@@ -312,9 +328,7 @@ Citizen.CreateThread(function()
     end
 end)
 
--- ─── Photographer NPC interaction ────────────────────────────────────────────
--- Uses PromptHasHoldModeCompleted — same system as IDCard NPC (confirmed working)
--- promptGroup3: [E] Take Photo | [Enter] Develop Film
+-- ─── Photographer approach interaction ───────────────────────────────────────
 Citizen.CreateThread(function()
     while true do
         local sleep = 2000
@@ -348,28 +362,28 @@ Citizen.CreateThread(function()
     end
 end)
 
--- ─── DEBUG: /phototest ───────────────────────────────────────────────────────
+-- ─── DEBUG /phototest ──────────────────────────────────────────────────────────
 RegisterCommand("phototest", function()
-    local myCoords = GetEntityCoords(PlayerPedId())
-    print(string.format("[phototest] Player: x=%.2f y=%.2f z=%.2f  cam=%s",
-        myCoords.x, myCoords.y, myCoords.z, tostring(cam)))
-    print(string.format("[phototest] movements3 ready: [1]=%s [2]=%s",
-        tostring(movements3[1] ~= nil), tostring(movements3[2] ~= nil)))
+    local me = GetEntityCoords(PlayerPedId())
+    print(string.format("[phototest] player x=%.3f y=%.3f z=%.3f cam=%s",
+        me.x, me.y, me.z, tostring(cam)))
+    print(string.format("[phototest] movements3 [1]=%s [2]=%s",
+        tostring(movements3[1]~=nil), tostring(movements3[2]~=nil)))
     for k, v in pairs(Config.Photographers) do
-        local ped = photographerPeds[k]
-        if ped and DoesEntityExist(ped) then
-            local p = GetEntityCoords(ped)
-            local dist = #(myCoords - p)
-            print(string.format("[phototest] '%s' ped=%d at x=%.2f y=%.2f z=%.2f dist=%.2f heading=%.1f %s",
-                k, ped, p.x, p.y, p.z, dist, GetEntityHeading(ped),
-                dist < Config.TalkDistance and "IN RANGE" or "out of range"))
+        local p = photographerPeds[k]
+        if p and DoesEntityExist(p) then
+            local pc   = GetEntityCoords(p)
+            local dist = #(me - pc)
+            print(string.format("[phototest] '%s' ped=%d x=%.3f y=%.3f z=%.3f heading=%.1f dist=%.2f %s",
+                k, p, pc.x, pc.y, pc.z, GetEntityHeading(p), dist,
+                dist < Config.TalkDistance and "<<IN RANGE>>" or "out of range"))
         else
-            print("[phototest] '" .. k .. "' NOT SPAWNED or stale")
+            print("[phototest] '"..k.."' NOT SPAWNED")
         end
     end
 end, false)
 
--- ─── ID Card NPC spawn + interact ────────────────────────────────────────────
+-- ─── IDCard NPC spawn ────────────────────────────────────────────────────────────
 local function isOpen(s)
     if not s then return true end
     local h = GetClockHours()
@@ -383,7 +397,7 @@ local function spawnPed(v, coords)
     while not HasModelLoaded(hash) do
         Citizen.Wait(10); t = t + 10
         if t > 5000 then
-            if v.npc and v.npc.fallback then hash = GetHashKey(v.npc.fallback); RequestModel(hash) end
+            if v.npc and v.npc.fallback then hash = GetHashKey(v.npc.fallback) end
             break
         end
     end
@@ -464,7 +478,7 @@ Citizen.CreateThread(function()
     end
 end)
 
--- ─── /idcard command ─────────────────────────────────────────────────────────
+-- ─── /idcard ──────────────────────────────────────────────────────────────────
 if Config.TakeCardType == "sql" then
     RegisterCommand(Config.ShowIdcardCommand, function()
         TriggerEvent("fx-idcard:client:showIDCardSQL")
@@ -477,8 +491,8 @@ AddEventHandler('onResourceStop', function(resourceName)
     for _, v in pairs(Config.Photographers) do
         if v.blipEntity then RemoveBlip(v.blipEntity) end
     end
-    for key, ped in pairs(photographerPeds) do
-        if ped then DeletePed(ped) end
+    for _, p in pairs(photographerPeds) do
+        if p then DeletePed(p) end
     end
     for _, v in pairs(Config.IDCardNPC) do
         if v.npcEntity  then DeletePed(v.npcEntity)   end

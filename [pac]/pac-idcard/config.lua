@@ -75,34 +75,55 @@ Config.ManIdCardItem           = "man_idcard"
 Config.WomanIdCardItem         = "woman_idcard"
 Config.ShowDistance            = 1.5
 
+--[[
+  BLACKWATER PHOTOGRAPHY STUDIO - COORDINATE MAP
+  Room runs roughly east(-813) <-> west(-807) along X axis
+  Y is constant ~-1372.56, Z floor = ~44.07
+
+  [BACK WALL]  x=-807  <-- subject stands here, faces EAST (heading=90)
+  [TRIPOD]     x=-813  <-- camera tripod prop is here
+  [NPC]        x=-813  <-- stands beside tripod, faces WEST toward subject (heading=90 in RDR = faces west... wait)
+
+  RDR HEADING NOTE:
+    0   = North (+Y direction)
+    90  = West  (-X direction)  <-- faces toward back wall from tripod side
+    180 = South (-Y direction)
+    270 = East  (+X direction)  <-- faces toward door/tripod from back wall
+
+  So:
+    Subject  at x=-807.5, heading=270 (faces east, toward camera)
+    NPC/cam  at x=-813.0, heading=90  (faces west, toward subject/back wall)
+]]
+
 Config.Photographers = {
     ["Blackwater"] = {
-        promptCoords   = vector4(-810.48, -1372.56, 43.02, 180.0),
+        promptCoords   = vector4(-810.48, -1372.56, 44.07, 180.0),
         promptDistance = 3.5,
 
-        -- Where the PLAYER stands to be photographed (against the back wall, facing the camera)
-        -- heading 90.0 = player faces east (toward the tripod/camera)
-        pedCoords = vector4(-807.50, -1372.56, 43.60, 90.0),
+        -- Player is placed HERE when photo session starts
+        -- x=-807.5 = back wall area, heading=270 = faces east toward camera
+        pedCoords = vector4(-807.50, -1372.56, 44.07, 270.0),
 
-        -- Scripted camera view: positioned behind the tripod, looking west at the subject
-        -- rot.z ~270 points the cam west
-        camCoords = vector4(-813.80, -1372.56, 44.60, 270.0),
-        camFov    = 55.0,
+        -- Scripted camera sits near the tripod, points west at subject
+        -- w component unused (we use PointCamAtCoord instead)
+        camCoords = vector4(-813.50, -1372.56, 44.80, 0.0),
+        camFov    = 50.0,
 
         npc = {
             model    = "mp_re_photography_females_01",
             hash     = 0x5730F05E,
             fallback = "cs_brontesbutler",
-            -- Stand right behind/beside the tripod, facing west (toward subject)
-            -- In RDR heading: 270 = west
-            coords   = vector4(-812.80, -1372.56, 43.60, 270.0),
+            -- x=-812.5 = beside tripod
+            -- z=44.07  = exact floor level (from /phototest player z)
+            -- heading=90 = faces WEST toward back wall / subject
+            coords   = vector4(-812.50, -1372.56, 44.07, 90.0),
         },
         blips = {
             name     = "ID Photo",
             sprite   = 1364029453,
             scale    = 0.6,
             modifier = "BLIP_MODIFIER_MP_COLOR_32",
-            coords   = vector3(-810.48, -1372.56, 43.02),
+            coords   = vector3(-810.48, -1372.56, 44.07),
         },
     },
 }
@@ -161,19 +182,19 @@ Config.IDCardNPC = {
 function Notify(data)
     local text  = data.text  or "No message"
     local time  = data.time  or 5000
-    local type  = data.type  or "info"
+    local ntype = data.type  or "info"
     local icon  = data.icon
     local color = data.color or 0
     local src   = data.source
     if IsDuplicityVersion() then
         if Framework == "VORP" then
             if icon then TriggerClientEvent('vorp:ShowAdvancedRightNotification', src, text, data.dict, icon, color, time)
-            else TriggerClientEvent("vorp:TipBottom", src, text, time, type) end
+            else TriggerClientEvent("vorp:TipBottom", src, text, time, ntype) end
         end
     else
         if Framework == "VORP" then
             if icon then TriggerEvent("vorp:ShowAdvancedRightNotification", text, data.dict, icon, color, time)
-            else TriggerEvent("vorp:TipBottom", text, time, type) end
+            else TriggerEvent("vorp:TipBottom", text, time, ntype) end
         end
     end
 end
