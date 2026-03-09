@@ -15,7 +15,6 @@ Config.TakeCardType = "sql" -- "item" or "sql" — sql = one unique ID per playe
 --   Up Arrow=172  Down Arrow=173  Left Arrow=174  Right Arrow=175
 --   Page Up=10    Page Down=11    (fallback zoom if +/- don't register)
 --   G=47   Backspace=177   Enter=18
---   Numpad+/- don't have reliable IDs; using PgUp/PgDn for zoom
 Config.Keybinds = {
     --              PromptHash    ControlID
     ["takephoto"]  = { 0x760A9C6F,  47  },  -- G
@@ -27,8 +26,8 @@ Config.Keybinds = {
     ["camForward"] = { 0x446258B6,  10  },  -- Page Up   (zoom in)
     ["camBack"]    = { 0x3C3DD371,  11  },  -- Page Down (zoom out)
     ["printphoto"] = { 0xC7B5340A,  18  },  -- Enter
-    ["filterPrev"] = { 0x62800C92,  74  },  -- Left Bracket / prev  (control 74)
-    ["filterNext"] = { 0x8BDE7443,  75  },  -- Right Bracket / next (control 75)
+    ["filterPrev"] = { 0x62800C92,  74  },  -- [ (filter prev)
+    ["filterNext"] = { 0x8BDE7443,  75  },  -- ] (filter next)
     ["takeidcard"] = { 0x2CD5343E,  51  },  -- E
 }
 
@@ -91,23 +90,23 @@ Config.ShowDistance            = 1.5
 
 Config.Photographers = {
     ["Blackwater"] = {
-        promptCoords   = vector4(-811.7769, -1373.9686, 44.0733, 104.9485),
+        promptCoords   = vector4(-810.48, -1372.56, 43.02, 104.9485),
         promptDistance = 2,
-        pedCoords      = vector4(-815.55, -1374.78, 44.28, -91.68),
+        pedCoords      = vector4(-810.48, -1372.56, 43.02, 285.0),
         camCoords      = vector4(-814.40, -1374.85, 44.90, 86.48),
         camFov         = 60.0,
         npc = {
             model    = "mp_npcambig_m_photogr",
             fallback = "cs_brontesbutler",
-            coords   = vector4(-811.50, -1372.80, 44.07, 285.0),
+            coords   = vector4(-810.48, -1372.56, 43.02, 285.0),
             anim     = "WORLD_HUMAN_SMOKE_NERVOUS_STRESSED",
         },
         blips = {
             name     = "ID Photo",
-            sprite   = -1656531561,
+            sprite   = 0x935EE440,  -- Stranger icon (person silhouette, RDR2 service NPC standard)
             scale    = 0.6,
             modifier = "BLIP_MODIFIER_MP_COLOR_32",
-            coords   = vector3(-811.50, -1372.80, 44.07),
+            coords   = vector3(-810.48, -1372.56, 43.02),
         },
     },
 }
@@ -135,7 +134,7 @@ Config.IDCardNPC = {
         distance = 3,
         blips = {
             name     = "IDENTITY PROCESS",
-            sprite   = -1656531561,
+            sprite   = 0x984E7CA9,  -- Doctor/scroll icon — distinct from photographer
             scale    = 0.6,
             modifier = "BLIP_MODIFIER_MP_COLOR_32",
         },
