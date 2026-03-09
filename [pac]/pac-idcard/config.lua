@@ -131,12 +131,15 @@ Config.CameraFilters = {
     { name = "Blood Moon",   filterType = "solid", r=150, g=5,  b=5,  a=0.40 },
     { name = "Acid Trip",    filterType = "acid"  },
     { name = "Foggy Lens",   filterType = "fog"   },
-    { name = "Pixelated",    filterType = "pixel", size = 8 },
+    { name = "Pixelated",    filterType = "pixel", size = 32 },
 }
 
+-- IDCard NPC: placed on the OUTSIDE steps/boardwalk of the Blackwater
+-- government building (fully accessible without noclip).
+-- Coords tuned from the street-side approach.
 Config.IDCardNPC = {
     ["Blackwater"] = {
-        coords   = vector4(-798.8420, -1194.6926, 44.0010, 161.6237),
+        coords   = vector4(-802.5, -1187.8, 44.0, 340.0),
         models   = "cs_brontesbutler",
         distance = 3,
         blips = { name="IDENTITY PROCESS", sprite=0x984E7CA9, scale=0.6, modifier="BLIP_MODIFIER_MP_COLOR_32" },
