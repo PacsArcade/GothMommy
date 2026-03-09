@@ -1,0 +1,3 @@
+-- Commands for pac-idcard are in sv_commands.lua
+-- This file intentionally left as a stub to avoid conflicts.
+-- Do not add command registrations here.
