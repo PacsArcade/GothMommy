@@ -77,6 +77,8 @@ Config.Text = {
     NoMembers        = "No members invited yet",
     MemberList       = "Camp members:",
     BedrollSet       = "Bedroll set. You will respawn here.",
+    BedrollSleep     = "Sleep",
+    BedrollNotOwner  = "This is not your bedroll",
     CampCmdDesc      = "Toggle camp pickup mode",
     InviteDesc       = "Invite a player to your camp (grants chest/door access)",
     KickDesc         = "Remove a player from your camp",
@@ -105,10 +107,12 @@ Config.Promp = {
     Chestopen = "Storage",
     Door      = "Door",
     Dooropen  = "Open/Close",
+    Bedroll   = "Bedroll",
     Key = {
-        Pickut = 0xE30CD707,
-        Chest  = 0x760A9C6F,
-        Door   = 0x760A9C6F,
+        Pickut  = 0xE30CD707,
+        Chest   = 0x760A9C6F,
+        Door    = 0x760A9C6F,
+        Bedroll = 0xCEFD9220,  -- E key
     }
 }
 
@@ -136,7 +140,11 @@ Config.Doors = {
     { modelDoor = 'p_doorriverboat01x'          },
 }
 
--- NOTE: bedroll is NOT in Config.Items — it does not place a prop.
+-- Bedroll models — proximity prompt + sleep on use
+Config.Bedrolls = {
+    { object = 'p_bedroll01x' },
+}
+
 Config.Items = {
     ["tent_trader"]             = { model = "mp005_s_posse_tent_trader07x",       veg = 10.0 },
     ["tent_bounty07"]           = { model = "mp005_s_posse_tent_bountyhunter07x", veg = 10.0 },
@@ -157,4 +165,6 @@ Config.Items = {
     ["door_02"]                  = { model = "p_doornbd39x_destruct"     },
     ["door_03"]                  = { model = "p_doorstrawberry01x_new"   },
     ["door_04"]                  = { model = "p_doorriverboat01x"        },
+    -- bedroll: placeable prop, proximity prompt triggers sleep + respawn set
+    ["bedroll"]                  = { model = "p_bedroll01x" },
 }

@@ -9,7 +9,6 @@ local function getAllUsableItemNames()
     for itemName, _ in pairs(Config.Items) do
         table.insert(names, itemName)
     end
-    table.insert(names, 'bedroll')
     return names
 end
 
@@ -33,6 +32,13 @@ end
 local function isChestModel(model)
     for _, c in ipairs(Config.Chests) do
         if c.object == model then return true end
+    end
+    return false
+end
+
+local function isBedrollModel(model)
+    for _, b in ipairs(Config.Bedrolls) do
+        if b.object == model then return true end
     end
     return false
 end
@@ -61,31 +67,15 @@ local function registerAllUsableItems()
             if not User then return end
             local Char = User.getUsedCharacter
             if not Char then return end
+            -- bedroll item in inventory now places the prop (same as other camp items)
+            -- sleeping is handled via proximity prompt on the placed prop
             TriggerClientEvent('pac_camp:client:sendTownToServer', src, itemName)
         end)
     end
 
-    -- Bedroll with full trace logging
-    exports.vorp_inventory:registerUsableItem('bedroll', function(data)
-        print('[pac-camp] BEDROLL USE CALLBACK FIRED - source: ' .. tostring(data and data.source))
-        local src  = data.source
-        local User = VORPcore.getUser(src)
-        if not User then
-            print('[pac-camp] BEDROLL ERROR: getUser returned nil for source ' .. tostring(src))
-            return
-        end
-        local Char = User.getUsedCharacter
-        if not Char then
-            print('[pac-camp] BEDROLL ERROR: getUsedCharacter returned nil')
-            return
-        end
-        print('[pac-camp] BEDROLL: triggering client event useBedroll for src ' .. tostring(src))
-        TriggerClientEvent('pac_camp:client:useBedroll', src)
-    end)
-
     local count = 0
     for _ in pairs(Config.Items) do count = count + 1 end
-    print('[pac-camp] Registered ' .. count + 1 .. ' usable items (including bedroll)')
+    print('[pac-camp] Registered ' .. count .. ' usable items')
 end
 
 -- -----------------------------------------------------------------------
@@ -117,72 +107,6 @@ AddEventHandler('onResourceStop', function(res)
     if GetCurrentResourceName() ~= res then return end
     unregisterAllUsableItems()
     print('[pac-camp] Unregistered all usable items')
-end)
-
--- -----------------------------------------------------------------------
--- DEBUG COMMAND: /bedrolldebug
--- Run this while holding a bedroll to diagnose the Use button issue.
--- Dumps: item in DB, item in VORP ServerItems cache, item in your inventory,
---        UsableItemsFunctions registration status.
--- -----------------------------------------------------------------------
-RegisterCommand('bedrolldebug', function(source, args)
-    local src = source
-    local User = VORPcore.getUser(src)
-    if not User then print('[bedrolldebug] no user'); return end
-    local Char = User.getUsedCharacter
-    if not Char then print('[bedrolldebug] no char'); return end
-
-    print('[bedrolldebug] ========== BEDROLL DEBUG ==========')
-    print('[bedrolldebug] player src=' .. tostring(src) .. ' identifier=' .. tostring(Char.identifier))
-
-    -- 1. Check DB
-    exports.oxmysql:execute("SELECT item, label, usable, type FROM items WHERE item = 'bedroll'", {}, function(rows)
-        if rows and #rows > 0 then
-            local r = rows[1]
-            print('[bedrolldebug] DB: item=' .. r.item .. ' label=' .. r.label .. ' usable=' .. tostring(r.usable) .. ' type=' .. r.type)
-        else
-            print('[bedrolldebug] DB: bedroll NOT FOUND in items table!')
-        end
-    end)
-
-    -- 2. Check player's inventory for bedroll
-    exports.oxmysql:execute(
-        "SELECT id, item, count FROM user_items WHERE identifier = ? AND item = 'bedroll'",
-        { Char.identifier },
-        function(rows)
-            if rows and #rows > 0 then
-                for _, r in ipairs(rows) do
-                    print('[bedrolldebug] user_items: id=' .. tostring(r.id) .. ' item=' .. r.item .. ' count=' .. tostring(r.count))
-                end
-            else
-                print('[bedrolldebug] user_items: no bedroll rows found for identifier=' .. tostring(Char.identifier))
-            end
-        end
-    )
-
-    -- 3. Check VORP in-memory registration
-    -- We can probe this indirectly by attempting to call GetResourceExports
-    -- The real check is whether vorp_inventory's UsableItemsFunctions has 'bedroll'
-    -- We can't read that table directly, but we can see if the 20000ms warning fires
-    print('[bedrolldebug] Sending test use event to vorp_inventory...')
-    TriggerEvent('vorp_inventory:Server:OnItemUse', { source = src, item = { item = 'bedroll', name = 'bedroll' } })
-
-    -- 4. Try firing the bedroll callback directly as a test
-    -- This tells us if OUR callback works even if VORP isn't calling it
-    print('[bedrolldebug] Firing useBedroll client event directly (bypass VORP)...')
-    TriggerClientEvent('pac_camp:client:useBedroll', src)
-
-    print('[bedrolldebug] ========== END DEBUG ==========')
-    print('[bedrolldebug] Check above for DB/inventory results.')
-    print('[bedrolldebug] If sleep anim plays NOW -> VORP is not calling our callback.')
-    print('[bedrolldebug] If sleep anim does NOT play -> client event is broken.')
-    VORPcore.NotifyLeft(src, 'Debug', 'Bedroll debug fired - check server console', 'generic_textures', 'tick', 4000, 'COLOR_WHITE')
-end, false)
-
--- Net event to confirm client received useBedroll
-RegisterNetEvent('pac_camp:debug:clientConfirm')
-AddEventHandler('pac_camp:debug:clientConfirm', function(msg)
-    print('[pac-camp] CLIENT CONFIRM from src=' .. tostring(source) .. ': ' .. tostring(msg))
 end)
 
 -- -----------------------------------------------------------------------
@@ -314,6 +238,42 @@ AddEventHandler('pac_camp:server:openChest', function(campId)
 end)
 
 -- -----------------------------------------------------------------------
+-- Use bedroll (proximity prompt → sleep → set respawn)
+-- Owner only - it's their bedroll
+-- -----------------------------------------------------------------------
+RegisterNetEvent('pac_camp:server:useBedroll')
+AddEventHandler('pac_camp:server:useBedroll', function(campId)
+    local src  = source
+    local User = VORPcore.getUser(src)
+    if not User then return end
+    local Char = User.getUsedCharacter
+    if not Char then return end
+
+    exports.oxmysql:execute('SELECT * FROM pac_camp WHERE id = ?', {campId}, function(rows)
+        if not rows or #rows == 0 then return end
+        local row = rows[1]
+
+        if not isBedrollModel(row.item_model) then return end
+
+        local isOwner = (row.owner_identifier == Char.identifier and row.owner_charid == Char.charIdentifier)
+        if not isOwner then
+            VORPcore.NotifyLeft(src, Config.Text.Camp, Config.Text.BedrollNotOwner, "menu_textures", "cross", 2000, "COLOR_RED")
+            return
+        end
+
+        -- Set respawn to the bedroll's saved world coordinates
+        exports.oxmysql:execute(
+            'INSERT INTO pac_camp_respawn (identifier,charid,x,y,z,heading) VALUES (@id,@cid,@x,@y,@z,@h) ON DUPLICATE KEY UPDATE x=@x, y=@y, z=@z, heading=@h',
+            {['@id']=Char.identifier, ['@cid']=Char.charIdentifier, ['@x']=row.x, ['@y']=row.y, ['@z']=row.z, ['@h']=row.rot_z or 0.0},
+            function()
+                VORPcore.NotifyLeft(src, Config.Text.Camp, Config.Text.BedrollSet, "generic_textures", "tick", 3000, "COLOR_GREEN")
+                print('[pac-camp] Bedroll respawn set for ' .. tostring(Char.identifier) .. ' at campId=' .. tostring(campId))
+            end
+        )
+    end)
+end)
+
+-- -----------------------------------------------------------------------
 -- Toggle door (owner OR camp member)
 -- -----------------------------------------------------------------------
 RegisterNetEvent('pac_camp:server:toggleDoor')
@@ -437,22 +397,8 @@ RegisterCommand(Config.Commands.CampWho, function(source, args)
 end, false)
 
 -- -----------------------------------------------------------------------
--- Bedroll respawn
+-- Spawn respawn teleport on character load
 -- -----------------------------------------------------------------------
-RegisterNetEvent('pac_camp:server:setBedrollRespawn')
-AddEventHandler('pac_camp:server:setBedrollRespawn', function(coords)
-    local src  = source
-    local User = VORPcore.getUser(src)
-    if not User then return end
-    local Char = User.getUsedCharacter
-    if not Char then return end
-    exports.oxmysql:execute(
-        'INSERT INTO pac_camp_respawn (identifier,charid,x,y,z,heading) VALUES (@id,@cid,@x,@y,@z,@h) ON DUPLICATE KEY UPDATE x=@x, y=@y, z=@z, heading=@h',
-        {['@id']=Char.identifier, ['@cid']=Char.charIdentifier, ['@x']=coords.x, ['@y']=coords.y, ['@z']=coords.z, ['@h']=coords.w or 0.0},
-        function() VORPcore.NotifyLeft(src, Config.Text.Camp, Config.Text.BedrollSet, "generic_textures", "tick", 3000, "COLOR_GREEN") end
-    )
-end)
-
 AddEventHandler('vorp_character:spawnAChar', function(source, data)
     local src = source
     local User = VORPcore.getUser(src)

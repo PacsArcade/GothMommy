@@ -7,7 +7,9 @@ local renderDistance = Config.RenderDistance
 local closestDoorEntity,  closestDoorId  = nil, nil
 local closestCampEntity,  closestCampId  = nil, nil
 local closestChestEntity, closestChestId = nil, nil
+local closestBedrollEntity, closestBedrollId = nil, nil
 local targetEnabled = false
+local isSleeping    = false
 
 local campPromptGroup  = UipromptGroup:new(Config.Promp.Controls)
 local campPickUpPrompt = Uiprompt:new(Config.Promp.Key.Pickut, Config.Promp.Collect, campPromptGroup)
@@ -20,6 +22,10 @@ chestPrompt:setStandardMode(true)
 local doorPromptGroup = UipromptGroup:new(Config.Promp.Door)
 local doorPrompt      = Uiprompt:new(Config.Promp.Key.Door, Config.Promp.Dooropen, doorPromptGroup)
 doorPrompt:setStandardMode(true)
+
+local bedrollPromptGroup = UipromptGroup:new(Config.Promp.Bedroll)
+local bedrollPrompt      = Uiprompt:new(Config.Promp.Key.Bedroll, Config.Text.BedrollSleep, bedrollPromptGroup)
+bedrollPrompt:setStandardMode(true)
 
 local function RotationToDirection(rot)
     local radX = math.rad(rot.x)
@@ -88,6 +94,13 @@ end
 
 local function isChestObject(model)
     for _, v in pairs(Config.Chests) do
+        if GetHashKey(v.object) == model then return true end
+    end
+    return false
+end
+
+local function isBedrollObject(model)
+    for _, v in pairs(Config.Bedrolls) do
         if GetHashKey(v.object) == model then return true end
     end
     return false
@@ -213,7 +226,7 @@ CreateThread(function()
 end)
 
 -- -----------------------------------------------------------------------
--- Chest + door proximity prompts
+-- Chest + door + bedroll proximity prompts
 -- -----------------------------------------------------------------------
 local function updateChestPrompts()
     local pCoords = GetEntityCoords(PlayerPedId())
@@ -227,7 +240,7 @@ local function updateChestPrompts()
     end
     local found = closestChestEntity ~= nil
     chestPromptGroup:setActive(found)
-    if found then chestPrompt:setText(Config.Promp.Chestopen.." ID - "..tostring(closestChestId).." ") end
+    if found then chestPrompt:setText(Config.Promp.Chestopen.." ID - "..tostring(closestChestId)..(" ")) end
     chestPrompt:setVisible(found); chestPrompt:setEnabled(found)
 end
 
@@ -247,8 +260,32 @@ local function updateDoorPrompts()
     doorPrompt:setVisible(found); doorPrompt:setEnabled(found)
 end
 
-CreateThread(function() while true do Wait(500); updateDoorPrompts()  end end)
-CreateThread(function() while true do Wait(500); updateChestPrompts() end end)
+local function updateBedrollPrompts()
+    if isSleeping then
+        bedrollPromptGroup:setActive(false)
+        bedrollPrompt:setVisible(false)
+        bedrollPrompt:setEnabled(false)
+        closestBedrollEntity, closestBedrollId = nil, nil
+        return
+    end
+    local pCoords = GetEntityCoords(PlayerPedId())
+    closestBedrollEntity, closestBedrollId = nil, nil
+    local cd = 2.0
+    for uid, ent in pairs(campsEntities or {}) do
+        if DoesEntityExist(ent) and isBedrollObject(GetEntityModel(ent)) then
+            local d = #(pCoords - GetEntityCoords(ent))
+            if d <= cd then cd=d; closestBedrollEntity=ent; closestBedrollId=uid end
+        end
+    end
+    local found = closestBedrollEntity ~= nil
+    bedrollPromptGroup:setActive(found)
+    if found then bedrollPrompt:setText(Config.Text.BedrollSleep) end
+    bedrollPrompt:setVisible(found); bedrollPrompt:setEnabled(found)
+end
+
+CreateThread(function() while true do Wait(500); updateDoorPrompts()    end end)
+CreateThread(function() while true do Wait(500); updateChestPrompts()   end end)
+CreateThread(function() while true do Wait(500); updateBedrollPrompts() end end)
 
 campPromptGroup:setOnHoldModeJustCompleted(function(group, prompt)
     if closestCampEntity and DoesEntityExist(closestCampEntity) and prompt==campPickUpPrompt and closestCampId then
@@ -266,6 +303,37 @@ end)
 doorPromptGroup:setOnStandardModeJustCompleted(function(group, prompt)
     if closestDoorEntity and DoesEntityExist(closestDoorEntity) and closestDoorId then
         TriggerServerEvent('pac_camp:server:toggleDoor', closestDoorId)
+    end
+end)
+
+bedrollPromptGroup:setOnStandardModeJustCompleted(function(group, prompt)
+    if closestBedrollEntity and DoesEntityExist(closestBedrollEntity) and closestBedrollId and not isSleeping then
+        local campId = closestBedrollId
+        TriggerServerEvent('pac_camp:server:useBedroll', campId)
+        -- immediately hide prompt so it doesn't re-fire
+        isSleeping = true
+        bedrollPromptGroup:setActive(false)
+        bedrollPrompt:setVisible(false)
+        bedrollPrompt:setEnabled(false)
+        -- run sleep anim then re-enable prompt
+        CreateThread(function()
+            local ped = PlayerPedId()
+            print('[pac-camp] bedroll prompt pressed, starting sleep')
+            local scenarioHash = GetHashKey("WORLD_HUMAN_SLEEP_GROUND")
+            local ok, err = pcall(function()
+                TaskStartScenarioInPlaceHash(ped, scenarioHash, 5000, true, 0, 0, false)
+            end)
+            if ok then
+                print('[pac-camp] sleep scenario started')
+                Wait(5500)
+                ClearPedTasksImmediately(ped)
+            else
+                print('[pac-camp] sleep scenario failed: ' .. tostring(err) .. ', plain wait')
+                Wait(3000)
+            end
+            isSleeping = false
+            print('[pac-camp] sleep done')
+        end)
     end
 end)
 
@@ -384,64 +452,8 @@ AddEventHandler('pac_camp:client:placePropCamp', function(itemName)
 end)
 
 -- -----------------------------------------------------------------------
--- Bedroll: sleep animation + set respawn
---
--- Strategy 1: TaskStartScenarioInPlaceHash with WORLD_HUMAN_SLEEP_GROUND
--- Strategy 2: anim dict (amb_camp@...) if scenario hash not available
--- Strategy 3: plain Wait (no visual, but respawn still sets correctly)
---
--- NOTE: IsTaskActive is a GTA5/FiveM native - NOT available in RedM.
---       We always attempt Strategy 1 directly.
+-- Respawn teleport (on spawn)
 -- -----------------------------------------------------------------------
-RegisterNetEvent('pac_camp:client:useBedroll')
-AddEventHandler('pac_camp:client:useBedroll', function()
-    local ped     = PlayerPedId()
-    local coords  = GetEntityCoords(ped)
-    local heading = GetEntityHeading(ped)
-
-    print('[pac-camp] useBedroll: starting sleep sequence')
-
-    -- Strategy 1: scenario hash (built-in RDR3 sleep behaviour)
-    local scenarioHash = GetHashKey("WORLD_HUMAN_SLEEP_GROUND")
-    print('[pac-camp] useBedroll: trying scenario hash ' .. tostring(scenarioHash))
-    local ok, err = pcall(function()
-        TaskStartScenarioInPlaceHash(ped, scenarioHash, 5000, true, 0, 0, false)
-    end)
-    if ok then
-        print('[pac-camp] useBedroll: scenario started OK, waiting 5.5s')
-        Wait(5500)
-        ClearPedTasksImmediately(ped)
-        print('[pac-camp] useBedroll: scenario done')
-    else
-        -- Strategy 2: anim dict fallback
-        print('[pac-camp] useBedroll: scenario failed (' .. tostring(err) .. '), trying anim dict')
-        local dict = "amb_camp@world_human_sleep_ground@male@back@idle_a"
-        print('[pac-camp] useBedroll: DoesAnimDictExist=' .. tostring(DoesAnimDictExist(dict)))
-        if DoesAnimDictExist(dict) then
-            RequestAnimDict(dict)
-            local t = 0
-            while not HasAnimDictLoaded(dict) and t < 60 do Wait(50); t = t + 1 end
-            if HasAnimDictLoaded(dict) then
-                print('[pac-camp] useBedroll: playing anim dict')
-                TaskPlayAnim(ped, dict, "idle_a", 2.0, -2.0, 5000, 1, 0, false, false, false)
-                Wait(5000)
-                StopAnimTask(ped, dict, "idle_a", 2.0)
-                RemoveAnimDict(dict)
-            else
-                print('[pac-camp] useBedroll: anim dict load timed out, plain wait')
-                Wait(3000)
-            end
-        else
-            -- Strategy 3: plain wait - no visual but respawn still saves
-            print('[pac-camp] useBedroll: anim dict not in this build, plain wait')
-            Wait(3000)
-        end
-    end
-
-    print('[pac-camp] useBedroll: sending setBedrollRespawn')
-    TriggerServerEvent('pac_camp:server:setBedrollRespawn', {x=coords.x, y=coords.y, z=coords.z, w=heading})
-end)
-
 RegisterNetEvent('pac_camp:client:applyRespawn')
 AddEventHandler('pac_camp:client:applyRespawn', function(coords)
     Wait(1000)
