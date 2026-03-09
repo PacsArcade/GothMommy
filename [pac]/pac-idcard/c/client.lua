@@ -1,6 +1,6 @@
--- ═══════════════════════════════════════════════════════════════
-print("[pac-idcard] VERSION: 2026-03-09-v13 div-filter+title-fix+blur-pixel")
--- ═══════════════════════════════════════════════════════════════
+-- =============================================================
+print("[pac-idcard] VERSION: 2026-03-09-v14 filter-overhaul")
+-- =============================================================
 
 local idcardData    = false
 local cam           = nil
@@ -168,12 +168,9 @@ applyFilter = function(idx)
         action     = 'setFilter',
         name       = filter.name,
         filterType = filter.filterType,
-        r          = filter.r,
-        g          = filter.g,
-        b          = filter.b,
-        a          = filter.a,
-        amount     = filter.amount,
-        size       = filter.size,
+        r = filter.r, g = filter.g, b = filter.b, a = filter.a,
+        amount = filter.amount,
+        size   = filter.size,
     })
 end
 
@@ -198,11 +195,8 @@ exitCamera = function(photographerKey, restoreHeading)
     SetNuiFocus(false, false)
     RenderScriptCams(false, false, 0, true, true)
     if cam then DestroyCam(cam, true) end
-    cam           = nil
-    currentCamPos = nil
-    defaultCamPos = nil
-    _currentPhotoKey       = nil
-    _currentDefaultHeading = nil
+    cam = nil; currentCamPos = nil; defaultCamPos = nil
+    _currentPhotoKey = nil; _currentDefaultHeading = nil
     SetPlayerControl(PlayerId(), true)
     FreezeEntityPosition(PlayerPedId(), false)
     TriggerServerEvent('fx-idcard:server:setBucket', 0)
@@ -213,30 +207,22 @@ exitCamera = function(photographerKey, restoreHeading)
 end
 
 local function takePhoto(v, key)
-    DoScreenFadeOut(1000)
-    Wait(1000)
+    DoScreenFadeOut(1000); Wait(1000)
     TriggerServerEvent('fx-idcard:server:setBucket', GetPlayerServerId(PlayerId()))
-
     local ped = PlayerPedId()
-    local pc  = v.pedCoords
-    local cc  = v.camCoords
-
+    local pc = v.pedCoords; local cc = v.camCoords
     local defaultHeading = v.npc and v.npc.coords.w or 270.0
     local photoHeading   = v.npc and v.npc.photoHeading or 90.0
     setPhotographerHeading(key, photoHeading)
-    _currentPhotoKey       = key
-    _currentDefaultHeading = defaultHeading
-
+    _currentPhotoKey = key; _currentDefaultHeading = defaultHeading
     SetEntityCoords(ped, pc.x, pc.y, pc.z, false, false, false, false)
     SetEntityHeading(ped, pc.w)
     FreezeEntityPosition(ped, true)
     SetPlayerControl(PlayerId(), false)
     Wait(800)
-
     local actualPos = GetEntityCoords(ped)
     print(string.format("[pac-idcard] photo pose: player at x=%.3f y=%.3f z=%.3f heading=%.1f",
         actualPos.x, actualPos.y, actualPos.z, GetEntityHeading(ped)))
-
     cam = CreateCam("DEFAULT_SCRIPTED_CAMERA", true)
     currentCamPos = { x=cc.x, y=cc.y, z=cc.z }
     defaultCamPos = { x=cc.x, y=cc.y, z=cc.z }
@@ -246,29 +232,18 @@ local function takePhoto(v, key)
     Citizen.InvokeNative(0x27666E5988D9D429, cam, v.camFov)
     SetCamActive(cam, true)
     RenderScriptCams(true, false, 0, true, true)
-    Wait(500)
-    DoScreenFadeIn(1000)
-
-    currentFilter = 1
-    applyFilter(currentFilter)
-
+    Wait(500); DoScreenFadeIn(1000)
+    currentFilter = 1; applyFilter(currentFilter)
     SetNuiFocus(true, false)
-    SendNUIMessage({
-        action  = 'showCameraOverlay',
-        visible = true,
-        pcx     = pc.x,
-        pcy     = pc.y,
-        pcz     = targetZ,
-    })
+    SendNUIMessage({ action='showCameraOverlay', visible=true, pcx=pc.x, pcy=pc.y, pcz=targetZ })
 end
 
 photographerPeds = {}
 
 local function spawnPhotographerPed(key, v)
     if photographerPeds[key] then return end
-    local npc    = v.npc
-    local coords = npc.coords
-    local hash   = npc.hash or GetHashKey(npc.model)
+    local npc = v.npc; local coords = npc.coords
+    local hash = npc.hash or GetHashKey(npc.model)
     RequestModel(hash)
     local t = 0
     while not HasModelLoaded(hash) do
@@ -277,26 +252,18 @@ local function spawnPhotographerPed(key, v)
             hash = GetHashKey(npc.fallback or "cs_brontesbutler")
             RequestModel(hash)
             local t2 = 0
-            while not HasModelLoaded(hash) do
-                Citizen.Wait(10); t2 = t2 + 10
-                if t2 > 3000 then break end
-            end
+            while not HasModelLoaded(hash) do Citizen.Wait(10); t2=t2+10; if t2>3000 then break end end
             break
         end
     end
     local p = CreatePed(hash, coords.x, coords.y, coords.z, coords.w, false, 0)
-    if not DoesEntityExist(p) then
-        print("[pac-idcard] ERROR: could not spawn photographer '"..key.."'")
-        return
-    end
+    if not DoesEntityExist(p) then print("[pac-idcard] ERROR: could not spawn photographer '"..key.."'"); return end
     FreezeEntityPosition(p, true)
     Citizen.InvokeNative(0x283978A15512B2FE, p, true)
-    SetEntityCanBeDamaged(p, false)
-    SetEntityInvincible(p, true)
+    SetEntityCanBeDamaged(p, false); SetEntityInvincible(p, true)
     SetBlockingOfNonTemporaryEvents(p, true)
     Citizen.InvokeNative(0xD8B8CFD709214ACD, p, true)
-    SetModelAsNoLongerNeeded(hash)
-    SetEntityAsMissionEntity(p, true, true)
+    SetModelAsNoLongerNeeded(hash); SetEntityAsMissionEntity(p, true, true)
     ClearPedTasks(p)
     photographerPeds[key] = p
     print(string.format("[pac-idcard] Spawned photographer '%s' ped=%d at z=%.3f heading=%.1f",
@@ -308,13 +275,12 @@ Citizen.CreateThread(function()
         local pos = GetEntityCoords(PlayerPedId())
         for key, v in pairs(Config.Photographers) do
             if v.npc then
-                local nc   = v.npc.coords
+                local nc = v.npc.coords
                 local dist = #(pos - vector3(nc.x, nc.y, nc.z))
                 if dist < Config.PedSpawnDistance and not photographerPeds[key] then
                     spawnPhotographerPed(key, v)
                 elseif dist > Config.PedSpawnDistance + 10 and photographerPeds[key] then
-                    DeletePed(photographerPeds[key])
-                    photographerPeds[key] = nil
+                    DeletePed(photographerPeds[key]); photographerPeds[key] = nil
                 end
             end
         end
@@ -325,12 +291,11 @@ end)
 Citizen.CreateThread(function()
     for k, v in pairs(Config.Photographers) do
         if v.blips and not v.blipEntity then
-            local c    = v.blips.coords or vector3(v.promptCoords.x, v.promptCoords.y, v.promptCoords.z)
+            local c = v.blips.coords or vector3(v.promptCoords.x, v.promptCoords.y, v.promptCoords.z)
             local blip = N_0x554d9d53f696d002(1664425300, c.x, c.y, c.z)
             Citizen.InvokeNative(0x0DF2B55F717DDB10, blip, false)
             Citizen.InvokeNative(0x662D364ABF16DE2F, blip, joaat(v.blips.modifier))
-            SetBlipSprite(blip, v.blips.sprite, 1)
-            SetBlipScale(blip, v.blips.scale)
+            SetBlipSprite(blip, v.blips.sprite, 1); SetBlipScale(blip, v.blips.scale)
             Citizen.InvokeNative(0x9CB1A1623062F402, blip, v.blips.name)
             v.blipEntity = blip
         end
@@ -344,20 +309,16 @@ Citizen.CreateThread(function()
         for k, v in pairs(Config.Photographers) do
             local ped = photographerPeds[k]
             if ped and DoesEntityExist(ped) then
-                local pedPos = GetEntityCoords(ped)
-                local dist   = #(myPos - pedPos)
+                local dist = #(myPos - GetEntityCoords(ped))
                 if dist < Config.TalkDistance and not cam then
                     sleep = 1
-                    PromptSetActiveGroupThisFrame(promptGroup3,
-                        CreateVarString(10, 'LITERAL_STRING', "Photographer"))
+                    PromptSetActiveGroupThisFrame(promptGroup3, CreateVarString(10,'LITERAL_STRING',"Photographer"))
                     if movements3[1] and PromptHasHoldModeCompleted(movements3[1]) then
-                        Config.HideHud()
-                        takePhoto(v, k)
+                        Config.HideHud(); takePhoto(v, k)
                         while cam do Wait(500) end
                         sleep = 2000
                     elseif movements3[2] and PromptHasHoldModeCompleted(movements3[2]) then
-                        SetNuiFocus(true, true)
-                        SendNUIMessage({ action = 'print' })
+                        SetNuiFocus(true, true); SendNUIMessage({ action = 'print' })
                     end
                 end
             end
@@ -373,7 +334,7 @@ RegisterCommand("phototest", function()
     for k, v in pairs(Config.Photographers) do
         local p = photographerPeds[k]
         if p and DoesEntityExist(p) then
-            local pc   = GetEntityCoords(p)
+            local pc = GetEntityCoords(p)
             local dist = #(me - pc)
             print(string.format("[phototest] '%s' ped=%d x=%.3f y=%.3f z=%.3f heading=%.1f dist=%.2f %s",
                 k, p, pc.x, pc.y, pc.z, GetEntityHeading(p), dist,
@@ -384,39 +345,29 @@ RegisterCommand("phototest", function()
     end
 end, false)
 
-local function isOpen(s)
-    if not s then return true end
-    local h = GetClockHours()
-    return h >= s.open and h <= s.close
-end
+local function isOpen(s) if not s then return true end; local h=GetClockHours(); return h>=s.open and h<=s.close end
 
 local function spawnPed(v, coords)
     local hash = GetHashKey((v.npc and v.npc.model) or v.models)
-    RequestModel(hash)
-    local t = 0
+    RequestModel(hash); local t=0
     while not HasModelLoaded(hash) do
-        Citizen.Wait(10); t = t + 10
-        if t > 5000 then
-            if v.npc and v.npc.fallback then hash = GetHashKey(v.npc.fallback) end
-            break
-        end
+        Citizen.Wait(10); t=t+10
+        if t>5000 then if v.npc and v.npc.fallback then hash=GetHashKey(v.npc.fallback) end; break end
     end
     local npc = CreatePed(hash, coords.x, coords.y, coords.z-1, coords.w, false, 0)
     FreezeEntityPosition(npc, true)
     Citizen.InvokeNative(0x283978A15512B2FE, npc, true)
-    SetEntityCanBeDamaged(npc, false)
-    SetEntityInvincible(npc, true)
+    SetEntityCanBeDamaged(npc, false); SetEntityInvincible(npc, true)
     SetBlockingOfNonTemporaryEvents(npc, true)
     Citizen.InvokeNative(0xD8B8CFD709214ACD, npc, true)
-    SetModelAsNoLongerNeeded(hash)
-    SetEntityAsMissionEntity(npc, true, true)
+    SetModelAsNoLongerNeeded(hash); SetEntityAsMissionEntity(npc, true, true)
     if v.anims then
         if v.anims.name then
             RequestAnimDict(v.anims.dict)
             while not HasAnimDictLoaded(v.anims.dict) do Citizen.Wait(100) end
-            TaskPlayAnim(npc, v.anims.dict, v.anims.name, 1.0,-1.0,-1,1,0,true,0,false,0,false)
+            TaskPlayAnim(npc,v.anims.dict,v.anims.name,1.0,-1.0,-1,1,0,true,0,false,0,false)
         else
-            TaskStartScenarioInPlace(npc, GetHashKey(v.anims.dict), 0, true, false, false, false)
+            TaskStartScenarioInPlace(npc,GetHashKey(v.anims.dict),0,true,false,false,false)
         end
     end
     return npc
@@ -436,8 +387,7 @@ Citizen.CreateThread(function()
                 local blip = N_0x554d9d53f696d002(1664425300, v.coords.x, v.coords.y, v.coords.z)
                 Citizen.InvokeNative(0x0DF2B55F717DDB10, blip, false)
                 Citizen.InvokeNative(0x662D364ABF16DE2F, blip, joaat(v.blips.modifier))
-                SetBlipSprite(blip, v.blips.sprite, 1)
-                SetBlipScale(blip, v.blips.scale)
+                SetBlipSprite(blip, v.blips.sprite, 1); SetBlipScale(blip, v.blips.scale)
                 Citizen.InvokeNative(0x9CB1A1623062F402, blip, v.blips.name)
                 v.blipEntity = blip
             end
@@ -452,18 +402,15 @@ end)
 
 Citizen.CreateThread(function()
     while true do
-        local sleep  = 2000
+        local sleep = 2000
         local coords = GetEntityCoords(PlayerPedId())
         for k, v in pairs(Config.IDCardNPC) do
             local dist = #(coords - vector3(v.coords.x, v.coords.y, v.coords.z))
             if dist < v.distance and v.canInteract then
                 sleep = 1
                 local label = Locale("promptitle2")
-                if Config.Prices.idcard and not v.illegal then
-                    label = label.." $"..Config.Prices.idcard
-                elseif v.illegal and Config.Prices.illegal then
-                    label = Locale("promptitle3").." $"..Config.Prices.illegal
-                end
+                if Config.Prices.idcard and not v.illegal then label = label.." $"..Config.Prices.idcard
+                elseif v.illegal and Config.Prices.illegal then label = Locale("promptitle3").." $"..Config.Prices.illegal end
                 PromptSetActiveGroupThisFrame(promptGroup2, CreateVarString(10,'LITERAL_STRING',label))
                 if PromptHasHoldModeCompleted(movements2[1]) then
                     Wait(50)
@@ -477,26 +424,17 @@ Citizen.CreateThread(function()
 end)
 
 if Config.TakeCardType == "sql" then
-    RegisterCommand(Config.ShowIdcardCommand, function()
-        TriggerEvent("fx-idcard:client:showIDCardSQL")
-    end)
+    RegisterCommand(Config.ShowIdcardCommand, function() TriggerEvent("fx-idcard:client:showIDCardSQL") end)
 end
 
 AddEventHandler('onResourceStop', function(resourceName)
     if GetCurrentResourceName() ~= resourceName then return end
-    for _, v in pairs(Config.Photographers) do
-        if v.blipEntity then RemoveBlip(v.blipEntity) end
-    end
-    for _, p in pairs(photographerPeds) do
-        if p then DeletePed(p) end
-    end
+    for _, v in pairs(Config.Photographers) do if v.blipEntity then RemoveBlip(v.blipEntity) end end
+    for _, p in pairs(photographerPeds) do if p then DeletePed(p) end end
     for _, v in pairs(Config.IDCardNPC) do
         if v.npcEntity  then DeletePed(v.npcEntity)   end
         if v.blipEntity then RemoveBlip(v.blipEntity) end
     end
     if cam then exitCamera(nil, nil) end
-    if creating then
-        AnimpostfxStop("OJDominoBlur")
-        SetNuiFocus(false, false)
-    end
+    if creating then AnimpostfxStop("OJDominoBlur"); SetNuiFocus(false, false) end
 end)

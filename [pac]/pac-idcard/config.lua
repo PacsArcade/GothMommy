@@ -66,7 +66,6 @@ Config.Prices = {
 }
 
 Config.AuthorizedJobs = { "sheriff", "lawenforcement", "marshal", "deputy" }
-
 Config.DeletePlayerDataCommand = "deleteidcard"
 Config.CheckIdCommand          = "checkid"
 Config.SelectPhotoTime         = 30
@@ -86,7 +85,7 @@ Config.Photographers = {
             model    = "mp_re_photography_females_01",
             hash     = 0x5730F05E,
             fallback = "cs_brontesbutler",
-            coords      = vector4(-811.771, -1373.614, 43.073, 270.0),
+            coords       = vector4(-811.771, -1373.614, 43.073, 270.0),
             photoHeading = 90.0,
         },
         blips = {
@@ -103,28 +102,29 @@ Config.PedSpawnDistance = 30
 Config.TalkDistance     = 2.5
 
 Config.Religious = {
-    "Christian", "Buddhist", "Wiccan", "Pagan",
-    "Spiritualist", "Coven",
-    "Jewish", "Muslim", "Atheist", "None"
+    "Christian","Buddhist","Wiccan","Pagan",
+    "Spiritualist","Coven",
+    "Jewish","Muslim","Atheist","None"
 }
 
 --[[
-  filterType values:
-    nil / absent = colour tint overlay (mix-blend-mode: multiply)
-    "overlay"    = semi-transparent colour wash (mix-blend-mode: overlay)
-    "acid"       = animated hue-rotate + SVG turbulence warp
-    "blur"       = backdrop-filter blur
-    "pixel"      = pixelated posterize effect via CSS
+  filterType values used by the NUI:
+    absent / nil  = None (no effect)
+    "tint"        = multiply colour overlay  (r,g,b,a)
+    "devil"       = purple tint + pulsing red eye-glow vignette
+    "acid"        = animated SVG turbulence warp + hue-rotate flood
+    "blur"        = CSS filter:blur applied via an animated div
+    "pixel"       = low-res scale trick (size = block pixels)
 ]]
 Config.CameraFilters = {
     { name = "None" },
-    { name = "Sepia",        filterType = "tint",    r=112, g=66,  b=20,  a=0.45 },
-    { name = "Thunderstorm", filterType = "tint",    r=40,  g=55,  b=80,  a=0.55 },
-    { name = "Blood Moon",   filterType = "overlay", r=180, g=20,  b=20,  a=0.40 },
-    { name = "Devil Eyes",   filterType = "overlay", r=120, g=0,   b=160, a=0.35 },
-    { name = "Acid Trip",    filterType = "acid" },
-    { name = "Blurry",       filterType = "blur",    amount = 6 },
-    { name = "Pixelated",    filterType = "pixel",   size = 8 },
+    { name = "Sepia",        filterType = "tint",  r=120, g=72,  b=22,  a=0.50 },
+    { name = "Thunderstorm", filterType = "tint",  r=30,  g=45,  b=80,  a=0.52 },
+    { name = "Blood Moon",   filterType = "tint",  r=160, g=10,  b=10,  a=0.45 },
+    { name = "Devil Eyes",   filterType = "devil" },
+    { name = "Acid Trip",    filterType = "acid"  },
+    { name = "Blurry",       filterType = "blur",  amount = 5 },
+    { name = "Pixelated",    filterType = "pixel", size   = 12 },
 }
 
 Config.IDCardNPC = {
@@ -132,61 +132,38 @@ Config.IDCardNPC = {
         coords   = vector4(-798.8420, -1194.6926, 44.0010, 161.6237),
         models   = "cs_brontesbutler",
         distance = 3,
-        blips = {
-            name     = "IDENTITY PROCESS",
-            sprite   = 0x984E7CA9,
-            scale    = 0.6,
-            modifier = "BLIP_MODIFIER_MP_COLOR_32",
-        },
-        anims = {
-            dict = "WORLD_HUMAN_HANG_OUT_STREET",
-            name = false,
-        },
-        timeSettings = {
-            open         = 8,
-            close        = 21,
-            blipmodifier = "BLIP_MODIFIER_MP_COLOR_2",
-        },
+        blips = { name="IDENTITY PROCESS", sprite=0x984E7CA9, scale=0.6, modifier="BLIP_MODIFIER_MP_COLOR_32" },
+        anims = { dict="WORLD_HUMAN_HANG_OUT_STREET", name=false },
+        timeSettings = { open=8, close=21, blipmodifier="BLIP_MODIFIER_MP_COLOR_2" },
     },
     ["IllegalCard"] = {
-        illegal      = true,
-        coords       = vector4(-813.2076, -1378.4711, 43.6373, 181.3653),
-        fakeLabel    = "Rhodes",
-        models       = "cs_brontesbutler",
-        distance     = 2,
-        blips        = false,
-        anims        = { dict = "WORLD_HUMAN_HANG_OUT_STREET", name = false },
-        timeSettings = false,
+        illegal=true,
+        coords=vector4(-813.2076, -1378.4711, 43.6373, 181.3653),
+        fakeLabel="Rhodes", models="cs_brontesbutler", distance=2,
+        blips=false, anims={dict="WORLD_HUMAN_HANG_OUT_STREET",name=false}, timeSettings=false,
     },
 }
 
 function Notify(data)
-    local text  = data.text  or "No message"
-    local time  = data.time  or 5000
-    local ntype = data.type  or "info"
-    local icon  = data.icon
-    local color = data.color or 0
-    local src   = data.source
+    local text=data.text or "No message"; local time=data.time or 5000
+    local ntype=data.type or "info"; local icon=data.icon
+    local color=data.color or 0; local src=data.source
     if IsDuplicityVersion() then
-        if Framework == "VORP" then
-            if icon then TriggerClientEvent('vorp:ShowAdvancedRightNotification', src, text, data.dict, icon, color, time)
-            else TriggerClientEvent("vorp:TipBottom", src, text, time, ntype) end
+        if Framework=="VORP" then
+            if icon then TriggerClientEvent('vorp:ShowAdvancedRightNotification',src,text,data.dict,icon,color,time)
+            else TriggerClientEvent("vorp:TipBottom",src,text,time,ntype) end
         end
     else
-        if Framework == "VORP" then
-            if icon then TriggerEvent("vorp:ShowAdvancedRightNotification", text, data.dict, icon, color, time)
-            else TriggerEvent("vorp:TipBottom", text, time, ntype) end
+        if Framework=="VORP" then
+            if icon then TriggerEvent("vorp:ShowAdvancedRightNotification",text,data.dict,icon,color,time)
+            else TriggerEvent("vorp:TipBottom",text,time,ntype) end
         end
     end
 end
 
 function Locale(key, subs)
-    local translate = Config.Locale[Config.Language][key]
-        and Config.Locale[Config.Language][key]
-        or "[missing: "..key.."]"
+    local translate = Config.Locale[Config.Language][key] and Config.Locale[Config.Language][key] or "[missing: "..key.."]"
     subs = subs or {}
-    for k, v in pairs(subs) do
-        translate = translate:gsub('%${' .. k .. '}', tostring(v))
-    end
+    for k,v in pairs(subs) do translate = translate:gsub('%${'..k..'}', tostring(v)) end
     return translate
 end

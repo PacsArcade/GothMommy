@@ -14,7 +14,6 @@
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
 
-        /* Form theme */
         .create { background: rgba(10,6,2,0.92) !important; color: #e8d8b0 !important; }
         .create .label, .create span { color: #c8a96e !important; }
         .create input, .create select { background: rgba(30,18,5,0.85) !important; color: #f0e0b0 !important; border-color: #6b4c20 !important; }
@@ -24,292 +23,265 @@
         .name-cont .label { margin-bottom:2px; }
         .name-cont input#name { margin-top:4px; }
 
-        /* ================================================
-           CAMERA FILTER SYSTEM
+        /*
+         * =====================================================
+         * FILTER LAYER STACK  (all behind #camera-overlay)
+         *
+         *  9950  #filter-tint     — rgba colour multiply tint
+         *  9955  #filter-pixel    — pixelate (scaled canvas)
+         *  9960  #filter-blur-div — CSS filter:blur on a div
+         *  9965  #filter-acid     — SVG turbulence + hue flood
+         *  9970  #filter-devil    — purple tint + red eye glow
+         *
+         *  9999  #camera-overlay  — HUD (isolation:isolate)
+         * =====================================================
+         */
 
-           All filters are implemented as full-screen <div>
-           elements layered BEHIND the HUD overlay.
-           The HUD itself uses isolation:isolate so nothing
-           from the filter layers bleeds into the menu text.
-
-           Layer stack (z-index):
-             9960  #filter-tint     solid colour tint
-             9965  #filter-blur     backdrop-filter blur
-             9970  #filter-pixel    pixelate overlay
-             9975  #filter-acid     SVG turbulence warp
-             9999  #camera-overlay  HUD (isolated)
-            10000  #cam-flash
-            10001  #cam-saved-toast
-        ================================================ */
-
-        /* --- shared layer base --- */
         .filter-layer {
             display: none;
             position: fixed;
             inset: 0;
             pointer-events: none;
+            will-change: opacity;
         }
 
-        /* Tint: solid RGBA colour with blend mode */
+        /* --- TINT (multiply colour over scene) --- */
         #filter-tint {
-            z-index: 9960;
-            /* colour set by JS via background */
+            z-index: 9950;
+            /* background set by JS */
             mix-blend-mode: multiply;
         }
 
-        /* Overlay: softer colour wash */
-        #filter-overlay {
-            z-index: 9961;
-            mix-blend-mode: overlay;
-            opacity: 0.7;
-        }
-
-        /* Blur: backdrop-filter on a transparent div */
-        #filter-blur {
-            z-index: 9965;
-            backdrop-filter: blur(0px);
-            -webkit-backdrop-filter: blur(0px);
-        }
-
-        /* Pixel: scaled-up canvas trick via image-rendering */
-        #filter-pixel {
-            z-index: 9970;
-            /* The pixel canvas sits inside this div */
-        }
+        /* --- PIXEL (small canvas upscaled with image-rendering:pixelated) --- */
+        #filter-pixel { z-index: 9955; }
         #pixel-canvas {
             position: absolute;
-            inset: 0;
+            top: 0; left: 0;
+            width: 100vw; height: 100vh;
             image-rendering: pixelated;
             image-rendering: crisp-edges;
         }
 
-        /* Acid: SVG feTurbulence distortion overlay */
-        #filter-acid {
-            z-index: 9975;
-            filter: url(#acid-filter);
-            opacity: 0;
-            transition: opacity 0.4s ease;
-            background: transparent;
+        /* --- BLUR (CSS filter on a div containing a white layer) ---
+             backdrop-filter is unreliable in CEF.
+             Instead we use a white semi-transparent div with
+             CSS filter:blur — it softens the content behind it
+             by adding a blurred haze over the scene.            --- */
+        #filter-blur-div {
+            z-index: 9960;
+            background: rgba(255,255,255,0.08);
+            /* filter applied to THIS div's own pixels, not scene */
+            filter: blur(0px);
+            animation: none;
         }
-        #filter-acid.active {
-            opacity: 1;
-            animation: acidPulse 1.6s ease-in-out infinite alternate;
+        #filter-blur-div.active {
+            animation: blurPulse 2s ease-in-out infinite alternate;
         }
-        @keyframes acidPulse {
-            0%   { filter: url(#acid-filter) hue-rotate(0deg)   saturate(6) brightness(1.1); }
-            50%  { filter: url(#acid-filter) hue-rotate(90deg)  saturate(9) brightness(1.2); }
-            100% { filter: url(#acid-filter) hue-rotate(200deg) saturate(7) brightness(1.0); }
+        @keyframes blurPulse {
+            0%   { filter: blur(4px)  brightness(0.92) saturate(0.7); background: rgba(200,220,255,0.10); }
+            50%  { filter: blur(8px)  brightness(0.88) saturate(0.5); background: rgba(200,220,255,0.14); }
+            100% { filter: blur(12px) brightness(0.85) saturate(0.4); background: rgba(200,220,255,0.10); }
         }
 
-        /* HUD wrapper - isolation:isolate is the key safety net */
+        /* --- ACID TRIP --- */
+        #filter-acid { z-index: 9965; }
+        /* Inner colour flood that gets warped by SVG filter */
+        #acid-flood {
+            position: absolute;
+            inset: 0;
+            animation: acidColors 1.8s linear infinite;
+            filter: url(#acid-filter);
+        }
+        @keyframes acidColors {
+            0%   { background: rgba(80, 0, 160, 0.28); filter: url(#acid-filter) hue-rotate(0deg); }
+            25%  { background: rgba(0, 160, 60,  0.28); filter: url(#acid-filter) hue-rotate(90deg); }
+            50%  { background: rgba(0, 80, 200,  0.28); filter: url(#acid-filter) hue-rotate(180deg); }
+            75%  { background: rgba(200, 60, 0,  0.28); filter: url(#acid-filter) hue-rotate(270deg); }
+            100% { background: rgba(80, 0, 160,  0.28); filter: url(#acid-filter) hue-rotate(360deg); }
+        }
+        /* Second wave for extra warp depth */
+        #acid-wave {
+            position: absolute;
+            inset: 0;
+            background: transparent;
+            filter: url(#acid-filter2);
+            animation: acidWave 2.4s ease-in-out infinite alternate;
+            opacity: 0.35;
+        }
+        @keyframes acidWave {
+            0%   { opacity: 0.20; filter: url(#acid-filter2) hue-rotate(30deg);  }
+            100% { opacity: 0.45; filter: url(#acid-filter2) hue-rotate(200deg); }
+        }
+
+        /* --- DEVIL EYES --- */
+        #filter-devil { z-index: 9970; }
+        /* Deep purple tint */
+        #devil-tint {
+            position: absolute;
+            inset: 0;
+            background: rgba(60, 0, 100, 0.38);
+        }
+        /* Red eye glow: two radial gradients positioned at eye level,
+           pulsing in opacity to look like glowing demonic eyes        */
+        #devil-eyes {
+            position: absolute;
+            inset: 0;
+            background:
+                radial-gradient(ellipse 7vw 4vh at 44% 36%, rgba(255,0,0,0.85) 0%, rgba(200,0,0,0.4) 35%, transparent 70%),
+                radial-gradient(ellipse 7vw 4vh at 56% 36%, rgba(255,0,0,0.85) 0%, rgba(200,0,0,0.4) 35%, transparent 70%);
+            animation: devilPulse 1.1s ease-in-out infinite alternate;
+            mix-blend-mode: screen;
+        }
+        @keyframes devilPulse {
+            0%   { opacity: 0.70; }
+            100% { opacity: 1.00; }
+        }
+
+        /* ---- HUD overlay (isolation:isolate keeps all filters contained) ---- */
         #camera-overlay {
             display: none;
-            position: fixed;
-            inset: 0;
+            position: fixed; inset: 0;
             pointer-events: none;
             z-index: 9999;
             isolation: isolate;
         }
 
-        /* Filter bar bottom-centre */
+        /* Filter bar */
         #filter-bar {
             position: absolute;
-            bottom: 44px;
-            left: 50%;
+            bottom: 44px; left: 50%;
             transform: translateX(-50%);
-            display: flex;
-            align-items: center;
-            gap: 18px;
+            display: flex; align-items: center; gap: 18px;
             background: rgba(10,6,2,0.82);
-            border: 1px solid #8b6914;
-            border-radius: 5px;
+            border: 1px solid #8b6914; border-radius: 5px;
             padding: 8px 24px;
-            pointer-events: none;
-            isolation: isolate;
+            pointer-events: none; isolation: isolate;
         }
         .filter-key {
-            font-family: 'Georgia', serif;
-            font-size: 15px;
-            color: #c8a96e;
-            background: rgba(20,12,2,0.90);
-            border: 1px solid #8b6914;
-            border-radius: 3px;
-            padding: 3px 10px;
-            letter-spacing: 1px;
+            font-family: 'Georgia', serif; font-size: 15px; color: #c8a96e;
+            background: rgba(20,12,2,0.90); border: 1px solid #8b6914;
+            border-radius: 3px; padding: 3px 10px; letter-spacing: 1px;
         }
         #filter-label {
-            font-family: 'Georgia', serif;
-            font-size: 20px;
-            color: #f0e0b0;
-            letter-spacing: 3px;
-            text-shadow: 1px 1px 8px #000;
-            min-width: 150px;
-            text-align: center;
+            font-family: 'Georgia', serif; font-size: 20px; color: #f0e0b0;
+            letter-spacing: 3px; text-shadow: 1px 1px 8px #000;
+            min-width: 140px; text-align: center;
         }
 
         /* Controls panel */
         #cam-controls {
-            position: absolute;
-            top: 50%;
-            right: 32px;
+            position: absolute; top: 50%; right: 28px;
             transform: translateY(-50%);
-            pointer-events: none;
-            isolation: isolate;
+            pointer-events: none; isolation: isolate;
             background: rgba(10,6,2,0.82);
-            border: 1px solid #8b6914;
-            border-radius: 6px;
-            padding: 16px 18px 14px;
-            width: 240px;
+            border: 1px solid #8b6914; border-radius: 6px;
+            padding: 14px 16px 12px;
+            width: 230px;
         }
         .cam-ctrl-title {
             font-family: 'Georgia', serif;
-            font-size: 16px;
+            font-size: 13px;          /* smaller so it fits */
             font-weight: bold;
             color: #d4a843;
             text-align: center;
-            letter-spacing: 5px;
+            letter-spacing: 4px;
             text-transform: uppercase;
-            text-shadow: 0 0 14px rgba(212,168,67,0.7);
-            margin-bottom: 12px;
-            padding-bottom: 10px;
+            text-shadow: 0 0 12px rgba(212,168,67,0.7);
+            margin-bottom: 10px;
+            padding-bottom: 8px;
             border-bottom: 1px solid rgba(139,105,20,0.5);
-            /* prevent overflow */
             white-space: nowrap;
             overflow: hidden;
-            text-overflow: clip;
+            text-overflow: ellipsis;
         }
-        .cam-action-row {
-            display: flex;
-            justify-content: center;
-            gap: 12px;
-            margin-bottom: 12px;
-        }
-        .cam-action-cell {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 5px;
-            flex: 1;
-        }
-        .cam-ctrl-divider {
-            height: 1px;
-            background: rgba(139,105,20,0.40);
-            margin: 8px 0;
-        }
-        .cam-numpad {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 8px;
-            justify-items: center;
-        }
-        .cam-numpad-cell {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 4px;
-            width: 100%;
-        }
+        .cam-action-row { display:flex; justify-content:center; gap:10px; margin-bottom:10px; }
+        .cam-action-cell { display:flex; flex-direction:column; align-items:center; gap:4px; flex:1; }
+        .cam-ctrl-divider { height:1px; background:rgba(139,105,20,0.40); margin:7px 0; }
+        .cam-numpad { display:grid; grid-template-columns:repeat(3,1fr); gap:7px; justify-items:center; }
+        .cam-numpad-cell { display:flex; flex-direction:column; align-items:center; gap:3px; width:100%; }
         .cam-key {
-            font-family: 'Georgia', serif;
-            font-size: 12px;
-            color: #f0e0b0;
-            background: rgba(20,12,2,0.92);
-            border: 1px solid #8b6914;
-            border-radius: 4px;
-            padding: 6px 0;
-            width: 100%;
-            text-align: center;
-            letter-spacing: 1px;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.6), inset 0 1px 0 rgba(212,168,67,0.15);
+            font-family: 'Georgia', serif; font-size: 11px; color: #f0e0b0;
+            background: rgba(20,12,2,0.92); border: 1px solid #8b6914;
+            border-radius: 4px; padding: 5px 0; width: 100%;
+            text-align: center; letter-spacing: 1px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.6), inset 0 1px 0 rgba(212,168,67,0.15);
         }
-        .cam-action-cell .cam-key { font-size: 13px; padding: 7px 0; }
+        .cam-action-cell .cam-key { font-size: 12px; padding: 6px 0; }
         .cam-key-label {
-            font-family: 'Georgia', serif;
-            font-size: 10px;
-            color: #c8a96e;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            text-align: center;
-            line-height: 1.2;
+            font-family: 'Georgia', serif; font-size: 9px; color: #c8a96e;
+            text-transform: uppercase; letter-spacing: 1px;
+            text-align: center; line-height: 1.2;
         }
-        .cam-action-cell .cam-key-label { font-size: 11px; }
+        .cam-action-cell .cam-key-label { font-size: 10px; }
 
         /* Countdown */
         #cam-countdown {
-            display: none;
-            position: absolute;
-            top: 50%; left: 50%;
+            display: none; position: absolute; top:50%; left:50%;
             transform: translate(-50%,-50%);
-            font-family: 'Georgia', serif;
-            font-size: 140px;
-            color: #f0e0b0;
+            font-family: 'Georgia', serif; font-size: 140px; color: #f0e0b0;
             text-shadow: 0 0 60px rgba(212,168,67,0.8), 2px 2px 10px #000;
             pointer-events: none;
             background: rgba(10,6,2,0.55);
-            border: 2px solid rgba(139,105,20,0.7);
-            border-radius: 8px;
-            padding: 10px 40px;
-            isolation: isolate;
+            border: 2px solid rgba(139,105,20,0.7); border-radius: 8px;
+            padding: 10px 40px; isolation: isolate;
         }
 
-        /* Photo saved toast */
+        /* Saved toast */
         #cam-saved-toast {
-            display: none;
-            position: fixed;
-            bottom: 80px; right: 24px;
-            background: rgba(10,6,2,0.88);
-            border: 1px solid #8b6914;
-            border-radius: 5px;
-            padding: 10px 20px;
-            font-family: 'Georgia', serif;
-            font-size: 15px;
-            color: #f0e0b0;
-            letter-spacing: 1px;
-            z-index: 10001;
-            pointer-events: none;
-            isolation: isolate;
+            display: none; position: fixed; bottom: 80px; right: 24px;
+            background: rgba(10,6,2,0.88); border: 1px solid #8b6914;
+            border-radius: 5px; padding: 10px 20px;
+            font-family: 'Georgia', serif; font-size: 15px; color: #f0e0b0;
+            letter-spacing: 1px; z-index: 10001; pointer-events: none; isolation: isolate;
         }
 
-        /* Camera flash */
+        /* Flash */
         #cam-flash {
-            display: none;
-            position: fixed; inset: 0;
-            background: #fff;
-            z-index: 10000;
-            pointer-events: none;
-            opacity: 0;
+            display: none; position: fixed; inset: 0;
+            background: #fff; z-index: 10000; pointer-events: none; opacity: 0;
         }
     </style>
 </head>
 <body>
 
-<!-- SVG filter defs (zero size, just referenced by id) -->
+<!-- SVG filter definitions -->
 <svg style="position:absolute;width:0;height:0;overflow:hidden" xmlns="http://www.w3.org/2000/svg">
   <defs>
-    <filter id="acid-filter" x="0%" y="0%" width="100%" height="100%">
-      <feTurbulence type="fractalNoise" baseFrequency="0.013 0.045" numOctaves="3" seed="4" result="noise">
-        <animate attributeName="baseFrequency" values="0.013 0.045;0.020 0.072;0.013 0.045" dur="1.8s" repeatCount="indefinite"/>
-        <animate attributeName="seed" values="4;7;11;4" dur="3.6s" repeatCount="indefinite"/>
+    <!-- Acid filter 1: strong drip warp -->
+    <filter id="acid-filter" x="-10%" y="-10%" width="120%" height="120%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.015 0.05" numOctaves="3" seed="3" result="noise">
+        <animate attributeName="baseFrequency" values="0.015 0.05;0.025 0.09;0.015 0.05" dur="1.4s" repeatCount="indefinite"/>
+        <animate attributeName="seed" values="3;6;9;12;3" dur="2.8s" repeatCount="indefinite"/>
       </feTurbulence>
-      <feDisplacementMap in="SourceGraphic" in2="noise" scale="32" xChannelSelector="R" yChannelSelector="G"/>
+      <feDisplacementMap in="SourceGraphic" in2="noise" scale="40" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+    <!-- Acid filter 2: slower secondary wave -->
+    <filter id="acid-filter2" x="-10%" y="-10%" width="120%" height="120%">
+      <feTurbulence type="turbulence" baseFrequency="0.008 0.03" numOctaves="2" seed="7" result="noise2">
+        <animate attributeName="baseFrequency" values="0.008 0.03;0.014 0.055;0.008 0.03" dur="2.2s" repeatCount="indefinite"/>
+      </feTurbulence>
+      <feDisplacementMap in="SourceGraphic" in2="noise2" scale="55" xChannelSelector="G" yChannelSelector="R"/>
     </filter>
   </defs>
 </svg>
 
-<!-- Filter layers (behind HUD, above game render) -->
-<div id="filter-tint"    class="filter-layer"></div>
-<div id="filter-overlay" class="filter-layer"></div>
-<div id="filter-blur"    class="filter-layer"></div>
-<div id="filter-pixel"   class="filter-layer"><canvas id="pixel-canvas"></canvas></div>
-<div id="filter-acid"    class="filter-layer"></div>
+<!-- Filter layers -->
+<div id="filter-tint"     class="filter-layer"></div>
+<div id="filter-pixel"    class="filter-layer"><canvas id="pixel-canvas"></canvas></div>
+<div id="filter-blur-div" class="filter-layer"></div>
+<div id="filter-acid"     class="filter-layer">
+    <div id="acid-flood"></div>
+    <div id="acid-wave"></div>
+</div>
+<div id="filter-devil"    class="filter-layer">
+    <div id="devil-tint"></div>
+    <div id="devil-eyes"></div>
+</div>
 
-<!-- Camera flash -->
 <div id="cam-flash"></div>
-
-<!-- Photo saved toast (outside overlay) -->
 <div id="cam-saved-toast">&#128247; Photo Saved</div>
 
-<!-- Camera HUD (isolation:isolate) -->
+<!-- HUD (isolation:isolate) -->
 <div id="camera-overlay">
     <div id="cam-countdown"></div>
 
@@ -321,20 +293,11 @@
 
     <div id="cam-controls">
         <div class="cam-ctrl-title">Photographer</div>
-
         <div class="cam-action-row">
-            <div class="cam-action-cell">
-                <div class="cam-key">ENTER</div>
-                <div class="cam-key-label">Take Photo</div>
-            </div>
-            <div class="cam-action-cell">
-                <div class="cam-key">NUM 0</div>
-                <div class="cam-key-label">Exit</div>
-            </div>
+            <div class="cam-action-cell"><div class="cam-key">ENTER</div><div class="cam-key-label">Take Photo</div></div>
+            <div class="cam-action-cell"><div class="cam-key">NUM 0</div><div class="cam-key-label">Exit</div></div>
         </div>
-
         <div class="cam-ctrl-divider"></div>
-
         <div class="cam-numpad">
             <div class="cam-numpad-cell"><div class="cam-key">NUM 7</div><div class="cam-key-label">Zoom In</div></div>
             <div class="cam-numpad-cell"><div class="cam-key">NUM 8</div><div class="cam-key-label">Cam Up</div></div>
@@ -349,15 +312,10 @@
     </div>
 </div>
 
-<!-- Game forms -->
-<div class="previewcreate-photo">
-    <img id="previewphoto" src="/ui/assets/printphoto.png" alt="">
-    <img id="preview-frame" src="/ui/assets/preview-frame.png" alt="">
-</div>
+<!-- Forms -->
+<div class="previewcreate-photo"><img id="previewphoto" src="/ui/assets/printphoto.png" alt=""><img id="preview-frame" src="/ui/assets/preview-frame.png" alt=""></div>
 <div class="create">
-    <button class="close-create"></button>
-    <h1>ID CARD</h1>
-    <h2>To create an ID card, fill in the following information</h2>
+    <button class="close-create"></button><h1>ID CARD</h1><h2>To create an ID card, fill in the following information</h2>
     <img id="usaflag" src="/ui/assets/flag1899.png" alt="">
     <div class="name-cont"><span class="label">NAME / SURNAME</span><input type="text" id="name" value="Louis Cunningham"><div class="line"></div></div>
     <div class="city-cont">
@@ -387,13 +345,9 @@
     <input type="text" name="link" id="link" placeholder="https://pacsarcade.org/idphotos/">
     <button class="preview">PREVIEW</button><button class="print">PRINT</button><button class="close"></button>
 </div>
-<div class="photograph">
-    <img class="photo" src="https://i.hizliresim.com/950uitk.png" alt="">
-    <div class="photo-frame"></div>
-</div>
+<div class="photograph"><img class="photo" src="https://i.hizliresim.com/950uitk.png" alt=""><div class="photo-frame"></div></div>
 <div class="id-card">
-    <img class="playerimg" src="https://i.hizliresim.com/950uitk.png" alt="">
-    <img class="frame" src="/ui/assets/frame.png" alt="">
+    <img class="playerimg" src="https://i.hizliresim.com/950uitk.png" alt=""><img class="frame" src="/ui/assets/frame.png" alt="">
     <span class="charid">NODATA</span><span class="sex">NODATA</span>
     <span class="hair">NODATA</span><span class="eyes">NODATA</span>
     <span class="height">NODATA</span><span class="weight">NODATA</span>
