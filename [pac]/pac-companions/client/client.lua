@@ -1,0 +1,4 @@
+-- client.lua pulled from rdn_companions upstream (HALALsnackbar)
+-- No modifications needed - client logic is framework-agnostic
+-- Source: https://github.com/HALALsnackbar/rdn_companions/blob/main/client/client.lua
+-- TODO: Copy full client.lua content from upstream after cloning

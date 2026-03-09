@@ -1,0 +1,4 @@
+-- warmenu.lua pulled from rdn_companions upstream (HALALsnackbar)
+-- No modifications needed - UI menu logic is framework-agnostic
+-- Source: https://github.com/HALALsnackbar/rdn_companions/blob/main/client/warmenu.lua
+-- TODO: Copy full warmenu.lua content from upstream after cloning
