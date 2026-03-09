@@ -10,7 +10,6 @@ local petXP = 0
 local pets = Config.Pets
 local fetchedObj = nil
 local Retrieving = false
-local Retrieved = true
 local notifyHungry = false
 local RetrievedEntities = {}
 local FeedTimer = 0
@@ -31,8 +30,6 @@ local AddedTrackPrompt = {}
 
 -- =====================================================================
 -- NOTIFICATION HELPER
--- Routes all in-game messages through VORP TipBottom so they match
--- the rest of the server UI (no more raw red DrawText).
 -- =====================================================================
 local function Notify(msg, ntype)
     ntype = ntype or "success"
@@ -40,7 +37,7 @@ local function Notify(msg, ntype)
 end
 
 -- =====================================================================
--- SHOP APPROACH PROMPT (uiprompt style, matches photographer UI)
+-- SHOP APPROACH PROMPT
 -- =====================================================================
 local shopPromptGroup = GetRandomIntInRange(0, 0xffffff)
 local shopPrompt = nil
@@ -59,7 +56,6 @@ Citizen.CreateThread(function()
     PromptRegisterEnd(shopPrompt)
     PromptSetHoldMode(shopPrompt, 500)
 end)
--- =====================================================================
 
 Citizen.CreateThread(function()
     for _, info in pairs(Config.Shops) do
@@ -70,7 +66,6 @@ Citizen.CreateThread(function()
         Citizen.InvokeNative(0x9CB1A1623062F402, blip, info.Name)
     end
 end)
-
 
 local function SetPetAttributes(entity)
     Citizen.InvokeNative(0x09A59688C26D88DF, entity, 0, 1100)
@@ -106,20 +101,18 @@ end
 
 local function checkAvailability(pet)
     local availability = pet.Availability
-    local available = false
     if availability ~= nil then
-        for index, peti in pairs(availability) do
-            if peti == CurrentZoneActive then
-                available = true
-                return available
-            end
+        for _, peti in pairs(availability) do
+            if peti == CurrentZoneActive then return true end
         end
-    else
-        available = true
+        return false
     end
-    return available
+    return true
 end
 
+-- =====================================================================
+-- MENU THREAD
+-- =====================================================================
 Citizen.CreateThread(function()
     WarMenu.CreateMenu('id_dog', '')
     repeat
@@ -128,10 +121,8 @@ Citizen.CreateThread(function()
                 TriggerServerEvent('rdn_companions:sellpet')
                 WarMenu.CloseMenu()
             end
-            local shop = Config.Shops[CurrentZoneActive]
             for i = 1, #pets do
-                local acheck = checkAvailability(pets[i])
-                if acheck == true then
+                if checkAvailability(pets[i]) then
                     if WarMenu.Button(pets[i]['Text'], pets[i]['SubText'], pets[i]['Desc']) then
                         TriggerServerEvent('rdn_companions:buydog', pets[i]['Param'])
                         WarMenu.CloseMenu()
@@ -145,15 +136,13 @@ Citizen.CreateThread(function()
 end)
 
 -- =====================================================================
--- MAIN LOOP: shop proximity prompt + U key to call/flee pet
--- Config.CallPetKey = true enables the U key (set in config.lua)
--- Uses control index 1 for keyboard input in RedM
+-- SHOP PROXIMITY LOOP
 -- =====================================================================
 Citizen.CreateThread(function()
     while true do
         local waitTime = 500
         for index, shop in pairs(Config.Shops) do
-            local IsZone, IdZone = IsNearZone(shop.Coords, shop.ActiveDistance, shop.Ring)
+            local IsZone = IsNearZone(shop.Coords, shop.ActiveDistance, shop.Ring)
             if IsZone then
                 waitTime = 1
                 PromptSetActiveGroupThisFrame(shopPromptGroup, CreateVarString(10, 'LITERAL_STRING', shop.Name))
@@ -164,24 +153,35 @@ Citizen.CreateThread(function()
                 end
             end
         end
+        Citizen.Wait(waitTime)
+    end
+end)
 
+-- =====================================================================
+-- U KEY THREAD — dedicated 0ms loop so no keypress is ever missed
+-- Calls pet if none out, dismisses if one is active.
+-- =====================================================================
+Citizen.CreateThread(function()
+    while true do
+        Citizen.Wait(0)
         if Config.CallPetKey == true then
             if IsControlJustPressed(1, keys[Config.TriggerKeys.CallPet]) then
                 if currentPetPed and DoesEntityExist(currentPetPed) then
+                    -- Pet is out — dismiss it
                     TriggerEvent('rdn_companions:putaway')
                 else
+                    -- No pet — call it
+                    Notify("Calling your companion...", "info")
                     TriggerServerEvent('rdn_companions:loaddog')
                 end
             end
         end
-
-        Citizen.Wait(waitTime)
     end
 end)
 -- =====================================================================
 
 
--- | Main Thread - checks if animal can hunt, checks timers | --
+-- | Main Thread - hunt mode, timers, death check |
 
 Citizen.CreateThread(function()
     while true do
@@ -254,8 +254,7 @@ Citizen.CreateThread(function()
                     notifyHungry = true
                 end
             end
-
-            if currentPetPed and IsEntityDead(currentPetPed) then
+            if IsEntityDead(currentPetPed) then
                 recentlySpawned = Config.PetAttributes.DeathCooldown
                 Notify(_U('PetDead'), "error")
                 Wait(3000)
@@ -276,9 +275,7 @@ Citizen.CreateThread(function()
             local result, entity = GetPlayerTargetEntity(id)
             if PromptHasStandardModeCompleted(FeedPrompt[entity]) then
                 local ped = PlayerPedId()
-                local coords = GetEntityCoords(ped)
-                local coordspet = GetEntityCoords(entity)
-                local distance = #(coords - coordspet)
+                local distance = #(GetEntityCoords(ped) - GetEntityCoords(entity))
                 if distance <= 3.75 then
                     if Config.FeedInterval <= FeedTimer then
                         TaskTurnPedToFaceEntity(ped, currentPetPed, 5000)
@@ -293,13 +290,11 @@ Citizen.CreateThread(function()
                         followOwner(currentPetPed, ped, false)
                         TriggerServerEvent('rdn_companions:feedPet', petXP)
                     else
-                        local timeLeft = SecondsToClock(Config.FeedInterval - FeedTimer)
-                        Notify("Your companion can be fed in: " .. timeLeft, "info")
+                        Notify("Your companion can be fed in: " .. SecondsToClock(Config.FeedInterval - FeedTimer), "info")
                     end
                     Wait(2000)
                 end
             end
-
             if PromptHasStandardModeCompleted(FollowPrompt[entity]) then
                 followOwner(currentPetPed, PlayerPedId(), false)
                 Wait(2000)
@@ -362,10 +357,7 @@ function DogEatAnimation()
     while not HasAnimDictLoaded(dict) do
         waiting = waiting + 100
         Citizen.Wait(100)
-        if waiting > 5000 then
-            Notify("You broke the animation, relocate.", "error")
-            break
-        end
+        if waiting > 5000 then Notify("Animation failed, try relocating.", "error"); break end
     end
     TaskPlayAnim(currentPetPed, dict, "base", 1.0, 8.0, -1, 1, 0, false, false, false)
 end
@@ -377,22 +369,17 @@ function DogSitAnimation()
     while not HasAnimDictLoaded(dict) do
         waiting = waiting + 100
         Citizen.Wait(100)
-        if waiting > 5000 then
-            Notify("You broke the animation, relocate.", "error")
-            break
-        end
+        if waiting > 5000 then Notify("Animation failed, try relocating.", "error"); break end
     end
     TaskPlayAnim(currentPetPed, dict, "base", 1.0, 8.0, -1, 1, 0, false, false, false)
 end
-
 
 function AddFeedPrompts(entity)
     local group = Citizen.InvokeNative(0xB796970BD125FCE8, entity, Citizen.ResultAsLong())
     FeedPrompt[entity] = PromptRegisterBegin()
     PromptSetControlAction(FeedPrompt[entity], 0xCEFD9220)
     PromptSetText(FeedPrompt[entity], CreateVarString(10, 'LITERAL_STRING', 'Feed'))
-    PromptSetEnabled(FeedPrompt[entity], true)
-    PromptSetVisible(FeedPrompt[entity], true)
+    PromptSetEnabled(FeedPrompt[entity], true); PromptSetVisible(FeedPrompt[entity], true)
     PromptSetStandardMode(FeedPrompt[entity], true)
     PromptSetGroup(FeedPrompt[entity], group)
     PromptRegisterEnd(FeedPrompt[entity])
@@ -403,8 +390,7 @@ function AddAttackPrompts(entity)
     AttackPrompt[entity] = PromptRegisterBegin()
     PromptSetControlAction(AttackPrompt[entity], 0x63A38F2C)
     PromptSetText(AttackPrompt[entity], CreateVarString(10, 'LITERAL_STRING', 'Pet Attack'))
-    PromptSetEnabled(AttackPrompt[entity], true)
-    PromptSetVisible(AttackPrompt[entity], true)
+    PromptSetEnabled(AttackPrompt[entity], true); PromptSetVisible(AttackPrompt[entity], true)
     PromptSetStandardMode(AttackPrompt[entity], true)
     PromptSetGroup(AttackPrompt[entity], group)
     PromptRegisterEnd(AttackPrompt[entity])
@@ -415,8 +401,7 @@ function AddTrackPrompts(entity)
     TrackPrompt[entity] = PromptRegisterBegin()
     PromptSetControlAction(TrackPrompt[entity], 0x9959A6F0)
     PromptSetText(TrackPrompt[entity], CreateVarString(10, 'LITERAL_STRING', 'Pet Track'))
-    PromptSetEnabled(TrackPrompt[entity], true)
-    PromptSetVisible(TrackPrompt[entity], true)
+    PromptSetEnabled(TrackPrompt[entity], true); PromptSetVisible(TrackPrompt[entity], true)
     PromptSetStandardMode(TrackPrompt[entity], true)
     PromptSetGroup(TrackPrompt[entity], group)
     PromptRegisterEnd(TrackPrompt[entity])
@@ -427,8 +412,7 @@ function AddFollowPrompts(entity)
     FollowPrompt[entity] = PromptRegisterBegin()
     PromptSetControlAction(FollowPrompt[entity], 0x63A38F2C)
     PromptSetText(FollowPrompt[entity], CreateVarString(10, 'LITERAL_STRING', 'Follow'))
-    PromptSetEnabled(FollowPrompt[entity], true)
-    PromptSetVisible(FollowPrompt[entity], true)
+    PromptSetEnabled(FollowPrompt[entity], true); PromptSetVisible(FollowPrompt[entity], true)
     PromptSetStandardMode(FollowPrompt[entity], true)
     PromptSetGroup(FollowPrompt[entity], group)
     PromptRegisterEnd(FollowPrompt[entity])
@@ -439,8 +423,7 @@ function AddStayPrompts(entity)
     StayPrompt[entity] = PromptRegisterBegin()
     PromptSetControlAction(StayPrompt[entity], 0x9959A6F0)
     PromptSetText(StayPrompt[entity], CreateVarString(10, 'LITERAL_STRING', 'Stay'))
-    PromptSetEnabled(StayPrompt[entity], true)
-    PromptSetVisible(StayPrompt[entity], true)
+    PromptSetEnabled(StayPrompt[entity], true); PromptSetVisible(StayPrompt[entity], true)
     PromptSetStandardMode(StayPrompt[entity], true)
     PromptSetGroup(StayPrompt[entity], group)
     PromptRegisterEnd(StayPrompt[entity])
@@ -451,8 +434,7 @@ function AddHuntModePrompts(entity)
     HuntModePrompt[entity] = PromptRegisterBegin()
     PromptSetControlAction(HuntModePrompt[entity], 0xB2F377E8)
     PromptSetText(HuntModePrompt[entity], CreateVarString(10, 'LITERAL_STRING', 'Hunt Mode'))
-    PromptSetEnabled(HuntModePrompt[entity], true)
-    PromptSetVisible(HuntModePrompt[entity], true)
+    PromptSetEnabled(HuntModePrompt[entity], true); PromptSetVisible(HuntModePrompt[entity], true)
     PromptSetStandardMode(HuntModePrompt[entity], true)
     PromptSetGroup(HuntModePrompt[entity], group)
     PromptRegisterEnd(HuntModePrompt[entity])
@@ -464,15 +446,16 @@ AddEventHandler('UI:DrawNotification', function(_message)
 end)
 
 RegisterNetEvent('rdn_companions:removedog')
-AddEventHandler('rdn_companions:removedog', function(args)
+AddEventHandler('rdn_companions:removedog', function()
     if currentPetPed then
         DeleteEntity(currentPetPed)
+        currentPetPed = nil
         Notify(_U('ReleasePet'), "info")
     end
 end)
 
 RegisterNetEvent('rdn_companions:putaway')
-AddEventHandler('rdn_companions:putaway', function(args)
+AddEventHandler('rdn_companions:putaway', function()
     if currentPetPed then
         DeleteEntity(currentPetPed)
         currentPetPed = nil
@@ -480,11 +463,11 @@ AddEventHandler('rdn_companions:putaway', function(args)
     end
 end)
 
-RegisterCommand("fleepet", function(source, args, rawCommand)
+RegisterCommand("fleepet", function()
     TriggerEvent('rdn_companions:putaway')
 end)
 
-RegisterCommand("callpet", function(source, args, rawCommand)
+RegisterCommand("callpet", function()
     TriggerServerEvent('rdn_companions:loaddog')
 end)
 
@@ -558,30 +541,29 @@ function setPetBehavior(petPed)
     SetRelationshipBetweenGroups(1, GetPedRelationshipGroupHash(petPed), -1683752762)
 end
 
-function followOwner(currentPetPed, PlayerPedId, isInShop)
-    FreezeEntityPosition(currentPetPed, false)
-    ClearPedTasks(currentPetPed)
-    ClearPedSecondaryTask(currentPetPed)
-    TaskFollowToOffsetOfEntity(currentPetPed, PlayerPedId, 0.0, -1.5, 0.0, 1.0, -1, Config.PetAttributes.FollowDistance * 100000000, 1, 1, 0, 0, 1)
+function followOwner(pet, owner, isInShop)
+    FreezeEntityPosition(pet, false)
+    ClearPedTasks(pet)
+    ClearPedSecondaryTask(pet)
+    TaskFollowToOffsetOfEntity(pet, owner, 0.0, -1.5, 0.0, 1.0, -1, Config.PetAttributes.FollowDistance * 100000000, 1, 1, 0, 0, 1)
     if isInShop then
-        Citizen.InvokeNative(0x489FFCCCE7392B55, currentPetPed, PlayerPedId)
+        Citizen.InvokeNative(0x489FFCCCE7392B55, pet, owner)
     end
 end
 
-function petStay(currentPetPed)
-    local coords = GetEntityCoords(currentPetPed)
-    ClearPedTasks(currentPetPed)
-    ClearPedSecondaryTask(currentPetPed)
+function petStay(pet)
+    ClearPedTasks(pet)
+    ClearPedSecondaryTask(pet)
     DogSitAnimation()
-    FreezeEntityPosition(currentPetPed, true)
+    FreezeEntityPosition(pet, true)
 end
 
-function ReturnKillToPlayer(fetchedKill, PlayerPedId)
-    local coords = GetEntityCoords(PlayerPedId)
+function ReturnKillToPlayer(fetchedKill, owner)
+    local coords = GetEntityCoords(owner)
     TaskGoToCoordAnyMeans(currentPetPed, coords, 1.5, 0, 0, 786603, 0xbf800000)
     while true do
         Citizen.Wait(2000)
-        coords = GetEntityCoords(PlayerPedId)
+        coords = GetEntityCoords(owner)
         local coords2 = GetEntityCoords(currentPetPed)
         TaskGoToCoordAnyMeans(currentPetPed, coords, 1.5, 0, 0, 786603, 0xbf800000)
         if GetDistanceBetweenCoords(coords, coords2, true) <= 2.0 then
@@ -589,16 +571,25 @@ function ReturnKillToPlayer(fetchedKill, PlayerPedId)
             Wait(100)
             PlaceObjectOnGroundProperly(fetchedObj, true)
             Retrieving = false
-            followOwner(currentPetPed, PlayerPedId, false)
+            followOwner(currentPetPed, owner, false)
             break
         end
     end
 end
 
-function spawnAnimal(model, player, x, y, z, h, skin, PlayerPedId, isdead, isshop, xp)
-    local EntityPedCoord = GetEntityCoords(player)
-    local EntitydogCoord = GetEntityCoords(currentPetPed)
-    if #(EntityPedCoord - EntitydogCoord) > 100.0 or isshop or isdead then
+function spawnAnimal(model, player, x, y, z, h, skin, ownerId, isdead, isshop, xp)
+    -- Guard: only skip re-spawn if pet is already nearby and healthy
+    -- When currentPetPed is nil, always spawn
+    local shouldSpawn = true
+    if currentPetPed ~= nil and DoesEntityExist(currentPetPed) and not isshop and not isdead then
+        local EntityPedCoord = GetEntityCoords(player)
+        local EntitydogCoord = GetEntityCoords(currentPetPed)
+        if #(EntityPedCoord - EntitydogCoord) <= 100.0 then
+            shouldSpawn = false
+        end
+    end
+
+    if shouldSpawn then
         if currentPetPed ~= nil then DeleteEntity(currentPetPed) end
         petXP = xp
         currentPetPed = CreatePed(model, x, y, z, h, 1, 1)
@@ -613,7 +604,7 @@ function spawnAnimal(model, player, x, y, z, h, skin, PlayerPedId, isdead, issho
         end
         SetPetAttributes(currentPetPed)
         setPetBehavior(currentPetPed)
-        SetPedAsGroupMember(currentPetPed, GetPedGroupIndex(PlayerPedId))
+        SetPedAsGroupMember(currentPetPed, GetPedGroupIndex(ownerId))
         if Config.RaiseAnimal then
             local halfGrowth = Config.FullGrownXp / 2
             if petXP >= Config.FullGrownXp then
@@ -632,7 +623,8 @@ function spawnAnimal(model, player, x, y, z, h, skin, PlayerPedId, isdead, issho
         end
         while (GetScriptTaskStatus(currentPetPed, 0x4924437d) ~= 8) do Wait(1000) end
         followOwner(currentPetPed, player, isshop)
-        if isdead and Config.PetAttributes.Invincible == false then
+        Notify("Your companion has arrived.", "success")
+        if isdead and not Config.PetAttributes.Invincible then
             Notify(_U('petHealed'), "success")
         end
     end
@@ -671,20 +663,17 @@ AddEventHandler('rdn_companions:spawndog', function(dog, skin, isInShop, xp, can
     local player = PlayerPedId()
     local model = GetHashKey(dog)
     local x, y, z, heading, a, b
+
+    RequestModel(model)
+    while not HasModelLoaded(model) do Wait(500) end
+
     if isInShop then
-        x, y, z, heading = -373.302, 786.904, 116.169, 273.18
+        local sx, sy, sz, sw = table.unpack(Config.Shops[CurrentZoneActive].Spawndog)
+        spawnAnimal(model, player, sx, sy, sz, sw, skin, PlayerPedId(), false, true, xp)
     else
         x, y, z = table.unpack(GetOffsetFromEntityInWorldCoords(player, 0.0, -5.0, 0.3))
         a, b = GetGroundZAndNormalFor_3dCoord(x, y, z + 10)
-    end
-    RequestModel(model)
-    while not HasModelLoaded(model) do Wait(500) end
-    if isInShop then
-        local x, y, z, w = table.unpack(Config.Shops[CurrentZoneActive].Spawndog)
-        spawnAnimal(model, player, x, y, z, w, skin, PlayerPedId(), false, true, xp)
-    else
-        local EntityIsDead = false
-        if currentPetPed ~= nil then EntityIsDead = IsEntityDead(currentPetPed) end
+        local EntityIsDead = currentPetPed ~= nil and IsEntityDead(currentPetPed)
         if EntityIsDead then
             spawnAnimal(model, player, x, y, b, heading, skin, PlayerPedId(), true, false, xp)
         else
@@ -697,8 +686,7 @@ function GetClosestAnimalPed(playerPed, radius)
     local playerCoords = GetEntityCoords(playerPed)
     local itemset = CreateItemset(true)
     local size = Citizen.InvokeNative(0x59B57C4B06531E1E, playerCoords, radius, itemset, 1, Citizen.ResultAsInteger())
-    local closestPed
-    local minDist = radius
+    local closestPed, minDist = nil, radius
     if size > 0 then
         for i = 0, size - 1 do
             local ped = GetIndexedItemInItemset(i, itemset)
@@ -706,12 +694,8 @@ function GetClosestAnimalPed(playerPed, radius)
                 local pedType = GetPedType(ped)
                 local model = GetEntityModel(ped)
                 if pedType == 28 and IsEntityDead(ped) and not RetrievedEntities[ped] and Config.Animals[model] then
-                    local pedCoords = GetEntityCoords(ped)
-                    local distance = #(playerCoords - pedCoords)
-                    if distance < minDist then
-                        closestPed = ped
-                        minDist = distance
-                    end
+                    local distance = #(playerCoords - GetEntityCoords(ped))
+                    if distance < minDist then closestPed = ped; minDist = distance end
                 end
             end
         end
@@ -724,18 +708,13 @@ function GetClosestFightingPed(playerPed, radius)
     local playerCoords = GetEntityCoords(playerPed)
     local itemset = CreateItemset(true)
     local size = Citizen.InvokeNative(0x59B57C4B06531E1E, playerCoords, radius, itemset, 1, Citizen.ResultAsInteger())
-    local closestPed
-    local minDist = radius
+    local closestPed, minDist = nil, radius
     if size > 0 then
         for i = 0, size - 1 do
             local ped = GetIndexedItemInItemset(i, itemset)
-            if playerPed ~= ped and playerPed ~= currentPetPed then
-                local pedCoords = GetEntityCoords(ped)
-                local distance = #(playerCoords - pedCoords)
-                if IsPedInCombat(playerPed, ped) then
-                    closestPed = ped
-                    minDist = distance
-                end
+            if playerPed ~= ped and ped ~= currentPetPed then
+                local distance = #(playerCoords - GetEntityCoords(ped))
+                if IsPedInCombat(playerPed, ped) then closestPed = ped; minDist = distance end
             end
         end
     end
@@ -744,26 +723,18 @@ function GetClosestFightingPed(playerPed, radius)
 end
 
 function SecondsToClock(seconds)
-    local seconds = tonumber(seconds)
+    seconds = tonumber(seconds)
     if seconds <= 0 then return "00:00:00" end
-    local hours = string.format("%02.f", math.floor(seconds / 3600))
-    local mins  = string.format("%02.f", math.floor(seconds / 60 - (hours * 60)))
-    local secs  = string.format("%02.f", math.floor(seconds - hours * 3600 - mins * 60))
-    return hours .. ":" .. mins .. ":" .. secs
+    local h = string.format("%02.f", math.floor(seconds / 3600))
+    local m = string.format("%02.f", math.floor(seconds / 60 - h * 60))
+    local s = string.format("%02.f", math.floor(seconds - h * 3600 - m * 60))
+    return h .. ":" .. m .. ":" .. s
 end
 
-function SET_BLIP_TYPE(animal)
-    return Citizen.InvokeNative(0x23f74c2fda6e7c61, -1749618580, animal)
-end
-function SET_ANIMAL_TUNING_BOOL_PARAM(animal, p1, p2)
-    return Citizen.InvokeNative(0x9FF1E042FA597187, animal, p1, p2)
-end
-function SET_PED_DEFAULT_OUTFIT(dog)
-    return Citizen.InvokeNative(0x283978A15512B2FE, dog, true)
-end
-function SET_PED_OUTFIT_PRESET(dog, preset)
-    return Citizen.InvokeNative(0x77FF8D35EEC6BBC4, dog, preset, 0)
-end
+function SET_BLIP_TYPE(animal) return Citizen.InvokeNative(0x23f74c2fda6e7c61, -1749618580, animal) end
+function SET_ANIMAL_TUNING_BOOL_PARAM(animal, p1, p2) return Citizen.InvokeNative(0x9FF1E042FA597187, animal, p1, p2) end
+function SET_PED_DEFAULT_OUTFIT(dog) return Citizen.InvokeNative(0x283978A15512B2FE, dog, true) end
+function SET_PED_OUTFIT_PRESET(dog, preset) return Citizen.InvokeNative(0x77FF8D35EEC6BBC4, dog, preset, 0) end
 
 AddEventHandler('onResourceStop', function(resource)
     if resource == GetCurrentResourceName() then
