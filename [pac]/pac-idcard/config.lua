@@ -79,7 +79,6 @@ Config.Photographers = {
     ["Blackwater"] = {
         promptCoords   = vector4(-810.48, -1372.56, 43.02, 180.0),
         promptDistance = 3.5,
-        -- pedCoords: where YOUR ped stands for the photo
         pedCoords      = vector4(-810.48, -1372.56, 43.02, 285.0),
         camCoords      = vector4(-814.40, -1374.85, 44.90, 86.48),
         camFov         = 60.0,
@@ -87,8 +86,8 @@ Config.Photographers = {
             model    = "mp_re_photography_females_01",
             hash     = 0x5730F05E,
             fallback = "cs_brontesbutler",
-            coords   = vector4(-810.48, -1372.56, 43.02, 180.0),  -- face south toward door/player
-            anim     = "WORLD_HUMAN_STAND_MOBILE",  -- verified RDR3 standing idle
+            coords   = vector4(-810.48, -1372.56, 43.02, 180.0),
+            anim     = "WORLD_HUMAN_HANG_OUT_STREET",  -- verified upright RDR3 standing idle
         },
         blips = {
             name     = "ID Photo",
@@ -130,7 +129,7 @@ Config.IDCardNPC = {
             modifier = "BLIP_MODIFIER_MP_COLOR_32",
         },
         anims = {
-            dict = "WORLD_HUMAN_STAND_MOBILE",
+            dict = "WORLD_HUMAN_HANG_OUT_STREET",
             name = false,
         },
         timeSettings = {
@@ -146,7 +145,7 @@ Config.IDCardNPC = {
         models       = "cs_brontesbutler",
         distance     = 2,
         blips        = false,
-        anims        = { dict = "WORLD_HUMAN_STAND_MOBILE", name = false },
+        anims        = { dict = "WORLD_HUMAN_HANG_OUT_STREET", name = false },
         timeSettings = false,
     },
 }

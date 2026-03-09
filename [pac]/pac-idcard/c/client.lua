@@ -1,5 +1,5 @@
 local idcardData    = false
-local cam           = 0
+local cam           = nil   -- MUST be nil, not 0! 'not 0' is false in Lua
 local currentCamPos = nil
 local movements     = {}
 local movements2    = {}
@@ -270,7 +270,8 @@ local function spawnPhotographerPed(key, v)
     Citizen.InvokeNative(0xD8B8CFD709214ACD, ped, true)
     SetModelAsNoLongerNeeded(hash)
     SetEntityAsMissionEntity(ped, true, true)
-    local animScenario = npc.anim or "WORLD_HUMAN_STAND_MOBILE"
+    -- WORLD_HUMAN_HANG_OUT_STREET: verified upright standing idle in RDR3
+    local animScenario = npc.anim or "WORLD_HUMAN_HANG_OUT_STREET"
     TaskStartScenarioInPlace(ped, GetHashKey(animScenario), 0, true, false, false, false)
     photographerPeds[key] = ped
     print("[pac-idcard] Spawned photographer '" .. key .. "' ped=" .. ped .. " anim=" .. animScenario)
@@ -316,9 +317,8 @@ Citizen.CreateThread(function()
 end)
 
 -- ─── Photographer NPC interaction ────────────────────────────────────────────
--- DrawText3D label above NPC + direct key detection (no prompt hold).
--- [E]     -> enter camera / take photo (costs nothing here, print costs $5)
--- [Enter] -> open print UI (paste screenshot URL -> adds item to inventory)
+-- [E]     -> enter camera mode
+-- [Enter] -> open print photo UI
 Citizen.CreateThread(function()
     while true do
         local sleep = 1000
@@ -355,29 +355,31 @@ Citizen.CreateThread(function()
 end)
 
 -- ─── DEBUG: /phototest command ─────────────────────────────────────────────────────
--- Prints ped status for every configured photographer to F8 console.
--- Also prints your current coords so you can fine-tune NPC placement.
 RegisterCommand("phototest", function()
     local myCoords = GetEntityCoords(PlayerPedId())
     print(string.format("[phototest] Player coords: x=%.2f y=%.2f z=%.2f",
         myCoords.x, myCoords.y, myCoords.z))
+    print(string.format("[phototest] cam=%s (nil=ready for interaction)", tostring(cam)))
     for k, v in pairs(Config.Photographers) do
         local ped = photographerPeds[k]
         if ped then
             if DoesEntityExist(ped) then
                 local pedCoords = GetEntityCoords(ped)
                 local dist = #(myCoords - pedCoords)
-                print(string.format("[phototest] '%s' ped=%d EXISTS at x=%.2f y=%.2f z=%.2f dist=%.2f",
-                    k, ped, pedCoords.x, pedCoords.y, pedCoords.z, dist))
+                print(string.format("[phototest] '%s' ped=%d EXISTS at x=%.2f y=%.2f z=%.2f dist=%.2f (TalkDist=%.1f)",
+                    k, ped, pedCoords.x, pedCoords.y, pedCoords.z, dist, Config.TalkDistance))
+                if dist < Config.TalkDistance then
+                    print("[phototest] -> IN RANGE: interaction should be active")
+                else
+                    print("[phototest] -> OUT OF RANGE: get closer")
+                end
             else
-                print("[phototest] '" .. k .. "' ped handle=" .. ped .. " but DoesEntityExist=false")
+                print("[phototest] '" .. k .. "' ped=" .. ped .. " DoesEntityExist=FALSE (stale handle)")
             end
         else
-            print("[phototest] '" .. k .. "' ped NOT spawned yet (photographerPeds[k]=nil)")
+            print("[phototest] '" .. k .. "' NOT SPAWNED")
         end
     end
-    print(string.format("[phototest] TalkDistance=%.1f cam=%s",
-        Config.TalkDistance, tostring(cam)))
 end, false)
 
 -- ─── ID Card NPC spawn + interact ────────────────────────────────────────────
