@@ -120,31 +120,66 @@ Config.ShowDistance            = 1.5            -- Distance at which /idcard ove
 -- Copy the ["Blackwater"] block, give it a new key name,
 -- and update all coords to your chosen location.
 -- =====================================================================
-Config.Photographers = {
+Config.IDCardNPC = {
     ["Blackwater"] = {
-        promptCoords   = vector4(-812.00, -1373.50, 44.07, 180.0),
-        promptDistance = 3.5,
-        pedCoords = vector4(-814.981, -1375.036, 43.228, 270.0),
-        camCoords = vector4(-812.721, -1375.099, 44.973, 0.0),
-        camFov    = 45.0,
-        npc = {
-            model    = "mp_re_photography_females_01",
-            hash     = 0x5730F05E,
-            fallback = "cs_brontesbutler",
-            coords       = vector4(-811.771, -1373.614, 43.073, 270.0),
-            photoHeading = 90.0,  -- NPC faces player during photo (West)
-        },
-        blips = {
-            name     = "ID Photo",
-            sprite   = 1364029453,
-            scale    = 0.6,
-            modifier = "BLIP_MODIFIER_MP_COLOR_32",
-            coords   = vector3(-812.00, -1373.50, 44.07),
-        },
+        -- Placed on the boardwalk outside the locked government building.
+        coords   = vector4(-802.5, -1187.8, 44.0, 340.0),
+        models   = "cs_brontesbutler",
+        distance = 3,
+        blips = { name="IDENTITY PROCESS", sprite=0x984E7CA9, scale=0.6, modifier="BLIP_MODIFIER_MP_COLOR_32" },
+        anims = { dict="WORLD_HUMAN_HANG_OUT_STREET", name=false },
+        timeSettings = { open=8, close=21, blipmodifier="BLIP_MODIFIER_MP_COLOR_2" },
     },
-    -- ["Valentine"] = {
-    --     ... copy Blackwater block and adjust coords
-    -- },
+    ["Strawberry"] = {
+        coords = vector4(-1803.5564, -345.7397, 164.4913, 210.3091),
+        models = "cs_brontesbutler",
+        distance = 3,
+        blips = { name="IDENTITY PROCESS", sprite=0x984E7CA9, scale=0.6, modifier="BLIP_MODIFIER_MP_COLOR_32" },
+        anims = { dict="WORLD_HUMAN_HANG_OUT_STREET", name=false },
+        timeSettings = { open=8, close=21, blipmodifier="BLIP_MODIFIER_MP_COLOR_2" },
+    },
+    ["Valentine"] = {
+        coords = vector4(-175.3824, 631.9274, 114.1396, 322.0134),
+        models = "cs_brontesbutler",
+        distance = 3,
+        blips = { name="IDENTITY PROCESS", sprite=0x984E7CA9, scale=0.6, modifier="BLIP_MODIFIER_MP_COLOR_32" },
+        anims = { dict="WORLD_HUMAN_HANG_OUT_STREET", name=false },
+        timeSettings = { open=8, close=21, blipmodifier="BLIP_MODIFIER_MP_COLOR_2" },
+    },
+    ["Rhodes"] = {
+        coords = vector4(1230.2253, -1298.4535, 76.9544, 216.9492),
+        models = "cs_brontesbutler",
+        distance = 3,
+        blips = { name="IDENTITY PROCESS", sprite=0x984E7CA9, scale=0.6, modifier="BLIP_MODIFIER_MP_COLOR_32" },
+        anims = { dict="WORLD_HUMAN_HANG_OUT_STREET", name=false },
+        timeSettings = { open=8, close=21, blipmodifier="BLIP_MODIFIER_MP_COLOR_2" },
+    },
+    ["Armadillo"] = {
+        coords = vector4(-3729.1255, -2601.2808, -12.8877, 181.9450),
+        models = "cs_brontesbutler",
+        distance = 3,
+        blips = { name="IDENTITY PROCESS", sprite=0x984E7CA9, scale=0.6, modifier="BLIP_MODIFIER_MP_COLOR_32" },
+        anims = { dict="WORLD_HUMAN_HANG_OUT_STREET", name=false },
+        timeSettings = { open=8, close=21, blipmodifier="BLIP_MODIFIER_MP_COLOR_2" },
+    },
+    ["Saintdenis"] = {
+        coords = vector4(2510.2656, -1308.9792, 49.0036, 270.7017),
+        models = "cs_brontesbutler",
+        distance = 3,
+        blips = { name="IDENTITY PROCESS", sprite=0x984E7CA9, scale=0.6, modifier="BLIP_MODIFIER_MP_COLOR_32" },
+        anims = { dict="WORLD_HUMAN_HANG_OUT_STREET", name=false },
+        timeSettings = { open=8, close=21, blipmodifier="BLIP_MODIFIER_MP_COLOR_2" },
+    },
+    ["IllegalCard"] = {
+        illegal = true,
+        coords = vector4(-813.2076, -1378.4711, 43.6373, 181.3653),
+        fakeLabel = "Rhodes",
+        models = "cs_brontesbutler",
+        distance = 2,
+        blips = false, -- Map marker disabled as requested
+        anims = { dict="WORLD_HUMAN_HANG_OUT_STREET", name=false },
+        timeSettings = false, -- Available 24/7
+    },
 }
 
 Config.PedSpawnDistance = 30  -- Distance from player before NPCs spawn/despawn
