@@ -8,8 +8,6 @@ local RSGCore
 
 local ConfigS = Config
 
--- GMRP NOTE: framework is hardcoded to "vorp" in config.lua.
--- The auto-detect block below is left intact for reference but will not run.
 if not ConfigS.framework then 
     if GetResourceState('redem') == 'started' then
         ConfigS.framework = "redemrp"
@@ -39,6 +37,7 @@ elseif ConfigS.framework == "vorp" then
     TriggerEvent("getCore",function(core)
         VorpCore = core
     end)
+    
     VorpInv = exports.vorp_inventory:vorp_inventoryApi()
 elseif ConfigS.framework == "qbr" then 
     qc = "qbr-core"
@@ -386,9 +385,8 @@ function RedMSQL(dat)
                 a = false
             end
         end)
-    elseif ConfigS.framework == "vorp" then
-        -- GMRP: oxmysql (swapped from ghmattimysql)
-        exports.oxmysql:execute("SELECT * FROM ricx_vampire WHERE identifier=@id2 AND charid=@id3", {id2=dat.identifier, id3=dat.charid}, function(result)
+    elseif ConfigS.framework == "vorp" then 
+        exports.ghmattimysql:execute("SELECT * FROM ricx_vampire WHERE identifier=@id2 AND charid=@id3", {id2=dat.identifier, id3=dat.charid}, function(result)
             Wait(200)
             if result[1] then
                 a = result
@@ -419,9 +417,8 @@ function RedMSQL_Update(dat, save)
     elseif ConfigS.framework == "redemrp-reboot" then
         MySQL.update("UPDATE ricx_vampire SET data=? WHERE identifier=? AND charid=?", {save, dat.identifier, dat.charid}, function(done)
         end)
-    elseif ConfigS.framework == "vorp" then
-        -- GMRP: oxmysql (swapped from ghmattimysql)
-        exports.oxmysql:execute("UPDATE ricx_vampire SET data=@data WHERE identifier=@id2 AND charid=@id3", {id2 = dat.identifier, id3 = dat.charid, data = save}, function(done)
+    elseif ConfigS.framework == "vorp" then 
+        exports.ghmattimysql:execute("UPDATE ricx_vampire SET data=@data WHERE identifier=@id2 AND charid=@id3", {id2 = dat.identifier, id3 = dat.charid, data = save}, function(done)
         end)
     elseif ConfigS.framework == "qbr" or ConfigS.framework == "qbr2" or ConfigS.framework == "rsg" then 
         MySQL.update("UPDATE ricx_vampire SET data=@data WHERE identifier=@id2 AND charid=@id3", {id2 = dat.identifier, id3 = dat.charid, data = save})
@@ -448,11 +445,10 @@ function RedMSQL_Insert(dat, save)
                 a = false 
             end
         end)
-    elseif ConfigS.framework == "vorp" then
-        -- GMRP: oxmysql (swapped from ghmattimysql)
-        exports.oxmysql:execute("INSERT INTO ricx_vampire (identifier, charid, data) VALUES (@identifier, @charid, @data)",  {identifier = dat.identifier, charid = dat.charid, data = save}, function(result)
+    elseif ConfigS.framework == "vorp" then 
+        exports.ghmattimysql:execute("INSERT INTO ricx_vampire (identifier, charid, data) VALUES (@identifier, @charid, @data)",  {identifier = dat.identifier, charid = dat.charid, data = save}, function(result)
             Wait(200)
-            if result and result.insertId and result.insertId > 0 then 
+            if result.insertId > 0 then 
                 a = result.insertId
             else
                 a = false 
