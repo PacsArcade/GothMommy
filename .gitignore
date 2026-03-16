@@ -1,0 +1,15 @@
+# RedM/Cfx junk
+cache/
+server-cache/
+*.log
+crashometry
+
+# Node.js (The secret-stealing folders)
+**/node_modules/
+
+# Sensitive Info
+.env
+credentials.json
+
+# Database exports (if you have any)
+*.sql
