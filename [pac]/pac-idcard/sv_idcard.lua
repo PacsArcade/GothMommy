@@ -1,0 +1,3 @@
+-- DEPRECATED: This file is a leftover from the original fx-idcard.
+-- All server logic has been moved to s/sv_main.lua and s/sv_commands.lua
+-- This file does nothing and will be removed in a future cleanup.
