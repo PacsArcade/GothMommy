@@ -89,11 +89,10 @@ RegisterNUICallback('createIdCard', function(data)
     TriggerServerEvent('fx-idcard:server:buyIdCard', data)
 end)
 
--- Screenshot: use the native export + F5 (RDR screenshot key = 166 INPUT_SCREENSHOT)
+-- Screenshot: native export + inject INPUT_SCREENSHOT (166) key press
 RegisterNUICallback('camShoot', function(data)
-    -- Native screenshot export
     Citizen.InvokeNative(0x3B96D87CB7DA1245, true)
-    -- Also fire the game's screenshot input so it saves to the gallery
+    -- Fire the game screenshot input so it saves to RDR gallery
     Citizen.InvokeNative(0xF7F35D8B26D22890, 0, 166, 0, 0, 0.0, 0.0, 0.0, 0.0, 0.0, false)
     Citizen.Wait(100)
     Citizen.InvokeNative(0xF7F35D8B26D22890, 0, 166, 1, 0, 0.0, 0.0, 0.0, 0.0, 0.0, false)
@@ -242,7 +241,7 @@ local function takePhoto(v, key)
     SetPlayerControl(PlayerId(), false)
     Wait(800)
     local actualPos = GetEntityCoords(ped)
-    print(string.format("[pac-idcard] photo pose: player at x=%.3f y=%.3f z=%.3f heading=%.1f",
+    print(string.format("[pac-idcard] photo pose: x=%.3f y=%.3f z=%.3f h=%.1f",
         actualPos.x, actualPos.y, actualPos.z, GetEntityHeading(ped)))
     cam = CreateCam("DEFAULT_SCRIPTED_CAMERA", true)
     currentCamPos = { x=cc.x, y=cc.y, z=cc.z }
@@ -287,8 +286,6 @@ local function spawnPhotographerPed(key, v)
     SetModelAsNoLongerNeeded(hash); SetEntityAsMissionEntity(p, true, true)
     ClearPedTasks(p)
     photographerPeds[key] = p
-    print(string.format("[pac-idcard] Spawned '%s' ped=%d z=%.3f h=%.1f",
-        key, p, GetEntityCoords(p).z, coords.w))
 end
 
 Citizen.CreateThread(function()
@@ -349,7 +346,7 @@ end)
 
 RegisterCommand("phototest", function()
     local me = GetEntityCoords(PlayerPedId())
-    print(string.format("[phototest] player x=%.3f y=%.3f z=%.3f heading=%.1f cam=%s",
+    print(string.format("[phototest] player x=%.3f y=%.3f z=%.3f h=%.1f cam=%s",
         me.x, me.y, me.z, GetEntityHeading(PlayerPedId()), tostring(cam)))
     for k, v in pairs(Config.Photographers) do
         local p = photographerPeds[k]
